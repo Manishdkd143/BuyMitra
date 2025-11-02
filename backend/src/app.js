@@ -15,14 +15,14 @@ app.use(cookieParser());
 //secured router
 import userRouter from "./routes/user.routes.js"
 import adminRouter from "./routes/admin.routes.js"
-
+import productRouter from "./routes/product.routes.js"
 
 
 
 app.use('/api/v1/auth',userRouter);
 app.use('/api/v1/users',userRouter);
-
 app.use('/api/v1/admin',adminRouter);
+app.use('/api/v1/product',productRouter);
 
 
 

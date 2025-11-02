@@ -15,4 +15,14 @@ const isAdmin=asyncHandler(async(req,res,next)=>{
         return  new ApiError(500,next(error))
     }
 })
-export {isAdmin}
+const isAdminOrDistributor=asyncHandler(async(req,res,next)=>{
+    const user=req?.user;
+        if(!user){
+            throw new ApiError(401,"Unauthorized user!")
+        }
+         if(user.role!=="Admin"||user.role!=="distributor"){
+            throw new ApiError(403,"Access denied-Admin and distributor only!")
+        }
+        next()
+})
+export {isAdmin,isAdminOrDistributor}

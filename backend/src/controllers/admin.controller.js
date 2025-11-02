@@ -5,7 +5,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 
 const getAllUser=asyncHandler(async(req,res)=>{
      const isLoggedUser=req?.user;
-  const {page=1,limit=10,search="",role,email}=req.params;
+  const {page=1,limit=10,search="",role,email}=req.query;
   const skip=(page-1)*limit;
      if(!isLoggedUser||isLoggedUser?.role!=="admin"){
         throw new ApiError(403,"Access denied-Admin only!")

@@ -87,8 +87,15 @@ const productSchema=new Schema({
     createdBy:{
         type:Schema.Types.ObjectId,
         ref:"Distributor"
+    },
+    updatedBy:{
+        type:Schema.Types.ObjectId,
+        ref:"distributor"
+    },
+    isVerified:{
+        type:Boolean,
+        default:false,
     }
-
 },{timestamps:true})
 productSchema.index({sku:1});
 productSchema.index({slug:1})

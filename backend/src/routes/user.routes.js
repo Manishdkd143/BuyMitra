@@ -5,7 +5,7 @@ import verifyJWT from "../middleware/auth.middleware.js";
 const router=Router();
 router.route("/register").post( Upload.single("profilePic"),userRegister)
 router.route("/login").post(userLogin)
-router.route('users/logout').post(verifyJWT,userLogout)
+router.route('/logout').post(verifyJWT,userLogout)
 router.route('/profile').get(verifyJWT,getCurrentUser)
 router.route("/users/update-password").patch(verifyJWT,updatePassword)
 router.route("/changeprofile").patch(verifyJWT,Upload.single("profilePic"),updateProfilePic)

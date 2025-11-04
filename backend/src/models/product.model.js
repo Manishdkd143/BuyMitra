@@ -1,7 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 
 const productSchema=new Schema({
-    title:{
+    name:{
         type:String,
         required:[true,"Product name is required!"],
         trim:true,
@@ -86,25 +86,24 @@ const productSchema=new Schema({
 
     createdBy:{
         type:Schema.Types.ObjectId,
-        ref:"Distributor"
+        ref:"User"
     },
     updatedBy:{
         type:Schema.Types.ObjectId,
-        ref:"distributor"
+        ref:"User"
     },
     isVerified:{
         type:Boolean,
         default:false,
     }
 },{timestamps:true})
-productSchema.index({sku:1});
-productSchema.index({slug:1})
+
 productSchema.index({category:1,status:1})
 productSchema.index({createdAt:1});
-productSchema.index({description:"text",title:"text"})
+productSchema.index({description:"text",name:"text"})
 productSchema.pre("save",function(next){
-   if(this.isModified("title")&&!this.slug){
-     this.slug=this.title.toLowerCase().replace('/[^a-z0-9]+/g',"-").replace("/^-|-$/g",'');
+   if(this.isModified("name")&&!this.slug){
+     this.slug=this.name.toLowerCase().replace('/[^a-z0-9]+/g',"-").replace("/^-|-$/g",'')?.trim();
    }
    next()
 })

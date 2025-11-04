@@ -1,17 +1,20 @@
-import { Product } from "../models/product.model";
-import { ApiError } from "../utils/ApiError";
-import { ApiResponse } from "../utils/ApiResponse";
-import asyncHandler from "../utils/asyncHandler";
+import { Product } from "../models/product.model.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import asyncHandler from "../utils/asyncHandler.js";
 import fs from "fs";
-import uploadFileOnCloud from "../utils/Cloudinary";
+import uploadFileOnCloud from "../utils/Cloudinary.js";
+import csv from "csvtojson";
+import deleteFileOnCloud from "../utils/deleteFileOnCloud.js";
+import { ensureCategoryExists } from "../utils/category.helper.js";
 const createProduct = asyncHandler(async (req, res) => {
   const isLoggedUser = req?.user;
-  if (isLoggedUser.role === "retailer") {
+  if (isLoggedUser?.role?.trim()?.toLowerCase() === "retailer") {
     req.files.forEach((file) => fs.unlinkSync(file.path));
-    throw new ApiError(400, "Retailer not allowed!");
+    throw new ApiError(400, "Access-denied retailer not allowed!");
   }
   const {
-    title,
+    name,
     description,
     price,
     wholesalePrice,
@@ -20,11 +23,18 @@ const createProduct = asyncHandler(async (req, res) => {
     stock,
     category,
     createdBy,
+    gst,
+    minOrderQty,
+    maxOrderQty,
+    lowStockAlert,
     status,
+    weight,
+    unit,
+    brand,
   } = req.body;
   if (
     [
-      title,
+      name,
       description,
       price,
       wholesalePrice,
@@ -39,15 +49,25 @@ const createProduct = asyncHandler(async (req, res) => {
     }
     throw new ApiError(400, "All fields required!");
   }
+ const existingProduct= await Product.findOne({$and:[{sku:sku?.trim()?.toUpperCase()},{name:name?.trim()?.toLowerCase()}]})
+ if(!existingProduct){
+  const imagesPathLocal = req.files?.map((file) => file.path);
+ imagesPathLocal.map((pathUrl)=>{
+  if(fs.existsSync(pathUrl)){
+    fs.unlinkSync(pathUrl)
+  }
+ })
+  throw new ApiError(409,"Product already exists!")
+ }
   if (!req.files || req.files.length === 0) {
     throw new ApiError(400, "Minimum one image is required!");
   }
-  const imagesPathLocal = req.files.map((file) => file.path);
+  const imagesPathLocal = req.files?.map((file) => file.path);
   const uploadPromise=imagesPathLocal.map(async(pathUrl)=>{
    const cloudUrl=await uploadFileOnCloud(pathUrl)
-   if(fs.existsSync(pathUrl)){
-      fs.unlinkSync(pathUrl)
-   }
+  //  if(fs.existsSync(pathUrl)){
+  //     fs.unlinkSync(pathUrl)
+  //  }
    return cloudUrl;
   })
   const imagesPath=await Promise.all(uploadPromise);
@@ -55,18 +75,20 @@ const createProduct = asyncHandler(async (req, res) => {
   if(!imagesPath||imagesPath.length===0){
    throw new ApiError(402,"file uploaded failed!")
   }
-const validImages=imagesPath.filter((url)=>url)
+const validImages=imagesPath.filter((file)=>file?.url).map((img)=>img?.url)
+// console.log(validImages[0]?.url)
 if(validImages.length===0){
    throw new ApiError(400,"All file upload failed!")
 }
+const categoryDoc=await ensureCategoryExists(category);
   const newProduct = await Product.create({
-    title: title.trim().toLowerCase(),
+    name: name.trim().toLowerCase(),
     description: description.trim(),
     sku: sku.trim().toUpperCase(),
     price: Number(price),
     wholesalePrice: Number(wholesalePrice),
     discount: Number(discount) || 0,
-    gst: Number(gst) || 0,
+    gst: Number(gst) || 18,
     stock: Number(stock) || 0,
     minOrderQty: Number(minOrderQty) || 1,
     maxOrderQty: Number(maxOrderQty) || null,
@@ -76,8 +98,8 @@ if(validImages.length===0){
     unit: unit?.trim().toLowerCase() || "piece",
     status: status || "active",
     brand: brand?.trim().toLowerCase() || null,
-    weight: weight || null,
-    category: category?.trim().toLowerCase(),
+    weight: Number(weight) || null,
+    category:categoryDoc._id,
     createdBy: req.user?._id,
   });
   if (!newProduct) {
@@ -106,7 +128,7 @@ const updateProductdetails = asyncHandler(async (req, res) => {
     throw new ApiError(404, "product not exists!");
   }
   const {
-    title,
+    name,
     description,
     price,
     wholesalePrice,
@@ -122,10 +144,11 @@ const updateProductdetails = asyncHandler(async (req, res) => {
     status,
     brand,
     weight,
+    slug,
   } = req.body;
   const updateField={}
-  if(title&&title?.trim()!==""){
-   updateField.title=title.trim().toLowerCase();
+  if(name&&name?.trim()!==""){
+   updateField.name=name.trim().toLowerCase();
   }
   if(description&&description?.trim()!==""){
    updateField.description=description.trim();
@@ -177,6 +200,9 @@ const updateProductdetails = asyncHandler(async (req, res) => {
   if(weight!==undefined){
   updateField.weight=Number(weight)
   }
+  if(slug&&slug!==""){
+    updateField.slug=slug;
+  }
   updateField.updatedBy=isLoggedUser?._id;
   updateField.updatedAt=Date.now()
   if(Object.keys(updateField).length===2){
@@ -202,10 +228,21 @@ const updateProdImages=asyncHandler(async(req,res)=>{
    if(!productId){
       throw new ApiError(400,"Product id required!")
    }
+  
    const imagesPathLocal=req.files.map(file=>file.path);
    if(!imagesPathLocal&&imagesPathLocal.length===0){
       throw new ApiError(404,"images are required")
    }
+    const product=await Product.findById(productId);
+   if(!product) throw new ApiError(404,"Product not exists!")
+    
+    if(product.images&&product.images.length>0){
+     const imagesPath=product.images.map((file)=>{
+      return file
+    });
+     
+     await deleteFileOnCloud(imagesPath)
+    }
    const uploadPromise=imagesPathLocal.map(async(filepath)=>{
       const cloudUrl=await uploadFileOnCloud(filepath);
       if(fs.existsSync(filepath)){
@@ -214,12 +251,14 @@ const updateProdImages=asyncHandler(async(req,res)=>{
       return cloudUrl
    })
    const validImages=await Promise.all(uploadPromise)
+  console.log(validImages);
+  const imgUrl=validImages.forEach((img)=>img.url);
    if(validImages.length===0){
       throw new ApiError(500,"All file upload failed!")
    }
-   const updatedProduct=await Product.findByIdAndUpdate({slug:slug},{
+   const updatedProduct=await Product.findByIdAndUpdate(productId,{
       $set:{
-         images:validImages,
+         images:imgUrl,
       },
    },{
       new:true,
@@ -231,7 +270,7 @@ const updateProdImages=asyncHandler(async(req,res)=>{
 })
 const removeProduct=asyncHandler(async(req,res)=>{
      const isLoggedUser = req?.user;
-  if (isLoggedUser.role === "retailer") {
+  if (isLoggedUser.role?.trim().toLowerCase() === "retailer") {
     throw new ApiError(400, "Retailer not allowed!");
   }
   const {productId}=req.params;
@@ -245,15 +284,19 @@ const removeProduct=asyncHandler(async(req,res)=>{
   return res.status(200).json(new ApiResponse(200,deletedProduct,"Product deleted successfully!"))
 })
 const getProductByIdOrSlug=asyncHandler(async(req,res)=>{
-   const {slug,productId}=req.params;
-   if(!slug||!productId){
+  console.log(req.query);
+  
+   const {slug,productId}=req.query;
+   if(!slug&&!productId){
       throw new ApiError(400,"Either slug or product id is required!")
    }
+   const validSlug=slug?.replace("-"," ")?.trim()?.toLowerCase();
+
    const isLoggedUser=req.user;
    if(!isLoggedUser){
       throw  new ApiError(400,"Unauthorized user!please login")
    }
- const productInfo=slug?await Product.findOne({slug:slug}).select("-lowStockQty -minOrderQty -maxOrderQty -updatedBy"):await Product.findOne({_id:productId}).select("-lowStockQty -minOrderQty -maxOrderQty -updatedBy");
+ const productInfo=validSlug?await Product.findOne({slug}).select("-lowStockQty -minOrderQty -maxOrderQty -updatedBy"):await Product.findOne({_id:productId}).select("-lowStockQty -minOrderQty -maxOrderQty -updatedBy");
  if(!productInfo){
   throw new ApiError(404,"product not exists!")
  }
@@ -276,53 +319,16 @@ const toggleVerify=asyncHandler(async(req,res)=>{
    await productExists.save();
    return res.status(200).json(new ApiResponse(200,productExists,`${productExists.isVerified?"Product is verified":"Product is unVerified"}`))
 })
-const getAllProductsByUser=asyncHandler(async(req,res)=>{
-  const {page=1,limit=10}=req.query;
-  const skip=(parseInt(page)-1)*parseInt(limit);
-  if(!req?.user){
-   throw new ApiError(401,"Unauthorized user!please login")
-  }
-  const findField={}
-  const {brand,category,isVerified}=req.query;
-  if(brand) findField.brand=brand?.trim();
-   if(category)findField.category=category?.trim();
-   if(isVerified)findField.isVerified=isVerified===true;
-  // const allProducts=await Product.find(findField,{updatedBy:0,minOrderQty:0,maxOrderQty:0,lowStockAlert:0,__v:0}).skip(skip).limit(limit).sort({createdAt:-1})
- const allProducts= await Product.aggregate([
-    {
-      $match:findField
-    },
-    {
-      $project:{
-        minOrderQty:0,
-        maxOrderQty:0,
-        lowStockAlert:0,
-        updatedBy:0,
-      }
-    },
-    {
-      $facet:{
-        metadata:[{$count:"total"}],
-        data:[{$skip:skip},{$limit:limit}]
-      }
-    }
-  ])
-  if(!allProducts){
-    throw new ApiError(404,"Product are empty!")
-  }
-  const totalProducts=allProducts[0]?.metadata[0]?.total||0;
-  return res.status(200).json(new ApiResponse(200,{currentPage:page,totalPage:Math.ceil(totalProducts/limit),products:allProducts[0]?.data||[]},"all products fetched successfully!"))
-})
-const unVerifiedUser=asyncHandler(async(req,res)=>{
+const unVerifiedProducts=asyncHandler(async(req,res)=>{
     const {page=1,limit=10}=req.query;
-  const skip=(parseInt(page)-1)*parseInt(limit);
+  const skip=(Number(page)-1)*Number(limit);
   if(!req?.user){
    throw new ApiError(401,"Unauthorized user!please login")
   }
-  if(req?.user?.role?.trim().toLowerCase()==="retailer"){
+  if(req.user?.role?.trim().toLowerCase()==="retailer"){
     throw new ApiError(500,"access-denied retailer not allowed.")
   }
-   const unVerifiedProducts=await Product.aggregate([
+   const unVerified=await Product.aggregate([
     {
       $match:{isVerified:false}
     },
@@ -333,8 +339,8 @@ const unVerifiedUser=asyncHandler(async(req,res)=>{
       }
     }
    ])
-     const total = unVerifiedProducts[0]?.metadata[0]?.total || 0;
-  const products = unVerifiedProducts[0]?.data || [];
+     const total = unVerified[0]?.metadata[0]?.total || 0;
+  const products = unVerified[0]?.data || [];
     if (total === 0) {
     return res
       .status(200)
@@ -345,7 +351,7 @@ const unVerifiedUser=asyncHandler(async(req,res)=>{
     new ApiResponse(
       200,
       {
-        currentPage: parseInt(page),
+        currentPage: Number(page),
         totalPages: Math.ceil(total / limit),
         totalProducts: total,
         products,
@@ -354,4 +360,316 @@ const unVerifiedUser=asyncHandler(async(req,res)=>{
     )
   );
 })
-export { createProduct,updateProductdetails,updateProdImages,removeProduct,getProductByIdOrSlug,getAllProductsByUser,toggleVerify,unVerifiedUser};
+const allProductsByAdminAndDist=asyncHandler(async(req,res)=>{
+  const user=req.user;
+  const {page=1,limit=10,search='',brand,category}=req.query;
+  const skip=(Number(page)-1)*Number(limit)
+  if(!user){
+    throw new ApiError(401,"Unauthorized user!please login")
+  }
+  if(user.role?.trim().toLowerCase()==="retailer"){
+    throw new ApiError(403,"access-denied retailer not allowed.")
+  }
+  const filterField={};
+  if(search){
+    filterField.$or=[
+      {name:{$regex:search,$options:"i"}},
+      {sku:{$regex:search,$options:"i"}},
+    ]
+  }
+  if(category?.trim())filterField.category=category?.trim().toLowerCase();
+  if(brand?.trim())filterField.brand=brand?.trim().toLowerCase();
+   
+  const products=await Product.aggregate([
+    {$match:filterField||{}},
+    {$sort:{createdAt:-1}},
+    {$facet:{
+      metadata:[{$count:"total"}],
+      data:[{$skip:skip},{$limit:Number(limit)}]
+    }},
+    
+  ])
+  if(!products){
+    throw new ApiError(404,"Products not found!")
+  }
+  const totalProducts=products[0]?.metadata[0]?.total||0;
+  const allProducts=products[0]?.data||[];
+  return res.status(200).json(new ApiResponse(200,{currentPage:Number(page),totalPage:Math.ceil(totalProducts/limit),total:totalProducts,allProducts},"Products fetched successfully!"))
+})
+
+const stockUpdate=asyncHandler(async(req,res)=>{
+  const user=req?.user;
+  const {productId}=req.params;
+  const {stock}=req.body;
+  if(!user){
+    throw new ApiError(401,"Unauthorized user!please login")
+  }
+if(!productId){
+  throw new ApiError(400,"Product id required!")
+}
+  if(user?.role?.trim().toLowerCase()==="retailer"){
+    throw new ApiError(403,"Access-denied retailer not allowed!")
+  }
+  if(stock===undefined||isNaN(stock)){
+    throw new ApiError(400,"Stock is required!")
+  }
+ const product=await Product.findByIdAndUpdate(productId,{
+  $set:{
+    stock:Number(stock),
+    updatedBy:user?._id,
+  }
+ },
+{new:true,runValidators:true});
+if(!product){
+  throw new ApiError(404,"Product not found!")
+}
+return res.status(200).json(new ApiResponse(200,product,"Stock is updated successfully"))
+})
+const lowStock=asyncHandler(async(req,res)=>{
+  const user=req?.user;
+  if(!user){
+    throw new ApiError(401,"Unauthorized user!please login")
+  }
+  if(user?.role?.trim().toLowerCase()==="retailer"){
+    throw new ApiError(403,"Access-denied retailer not allowed!")
+  }
+  const lowStockProducts=await Product.aggregate([
+    {
+      $match:{
+        $expr:{$lte:["$stock","$lowStockAlert"]}
+      }
+    },
+    {
+      $sort:{createdAt:-1}
+    },
+    {$project:{
+       name: 1,
+        sku: 1,
+        brand: 1,
+        category: 1,
+        stock: 1,
+        lowStockAlert: 1,
+        createdAt: 1
+    }}
+  ]);
+     if (!lowStockProducts || lowStockProducts.length === 0) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, [], "No low-stock products found."));
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { total: lowStockProducts.length, products: lowStockProducts },
+      "Low-stock products fetched successfully!"
+    )
+  );
+})
+const bulkUploadProducts=asyncHandler(async(req,res)=>{
+  const user=req?.user;
+  if(!user){
+    throw new ApiError(404,"Unauthorized user!please login")
+  }
+  if(!req.file){
+    throw new ApiError(400,"file is required!")
+  }
+  const csvPath=req.file?.path
+    const jsonArray=await csv().fromFile(csvPath);
+    if(!jsonArray&&!jsonArray?.length){
+      fs.unlinkSync(csvPath)
+      throw new ApiError(400,"file conversion failed!")
+    }
+    const validProducts=jsonArray.filter((p)=>{
+     return p.name&&p.slug&&p.price&&p.stock
+    })
+     if (!validProducts&&!validProducts?.length)
+     { 
+        fs.unlinkSync(csvPath);
+        throw new ApiError(400, "No valid products found in CSV!");
+      }
+    const slugs=validProducts.map((p)=>p.slug)
+    const existing=await Product.find({slug:{$in:slugs}}).select("slug");
+    const existingSlugs=new Set(existing.map((p)=>p.slug))
+  const newProducts=validProducts.filter((p)=>!existingSlugs.has(p.slug))
+if(!newProducts.length){
+  fs.unlinkSync(csvPath)
+  throw new ApiError(409, "All products already exist!")
+}
+    const productsWithImages=await  Promise.all(
+      newProducts.map(async(p)=>{
+        let imagesArr=[];
+      if(p?.images){
+          if(p.images?.startsWith("http")){
+            imagesArr.push(p.images)
+          }
+        else{
+         const uploaded= await uploadFileOnCloud(p.images);
+         if(uploaded?.url) imagesArr.push(uploaded.url)
+        }
+      }
+      return {
+        ...p,
+        images:imagesArr,
+        category:await ensureCategoryExists(p?.category)
+      }
+      })
+    )
+    const cleanProducts = productsWithImages.map((p, i) => ({
+  ...p,
+  price: Number(p.price) || 0,
+  stock: Number(p.stock) || 0,
+  lowStockAlert: Number(p.lowStockAlert) || 0,
+  discount: Number(p.discount) || 0,
+  createdBy: user?._id,
+  sku: `SKU${Date.now()}${i}`.toUpperCase(),
+}));
+
+    console.log(cleanProducts)
+    const insertedProducts= await Product.insertMany(cleanProducts,{ordered:false});
+    fs.unlinkSync(csvPath)
+    if(!insertedProducts&&!insertedProducts.length){
+      throw new ApiError(400,"Product uplaoded failed!")
+    }
+    return res.status(201).json(new ApiResponse(201,{insertedCount:insertedProducts.length,skippedProducts:existingSlugs.size,inserted:insertedProducts},"products created successfully"))
+
+})
+
+const bulkdelete=asyncHandler(async(req,res)=>{
+  const user=req?.user;
+  if(!user){
+    throw new ApiError(401,"Unauthorized user!please login")
+  }
+  if(user?.role?.trim().toLowerCase()==="retailer"){
+    throw new ApiError(400,"Access-denied retailer not allowed!")
+  }
+  const {ids}=req.body
+   if(!ids&&ids.length===0){
+    throw new ApiError(400,"At least one product selected for deleted!")
+   }
+   const existingProduct=await Product.find({_id:{$in:ids}})
+   if(existingProduct.length===0){
+      throw new ApiError(404,"No product found for the given IDs!")
+   }
+   for (const product of existingProduct) {
+     if(product.images&&product.images.length>0){
+      for (const img of product.images) {
+        await deleteFileOnCloud(img)
+      }
+     }
+   }
+   const deletedProduct=await Product.deleteMany({_id:{$in:ids}})
+   if(deletedProduct.length===0){
+    throw new ApiError(400,"No products deleted. Please try again!")
+   }
+   return res.status(200).json(new ApiResponse(200,{total:deletedProduct.deletedCount,deletedProduct},"All selected products deleted successfully"))
+})
+const stats=asyncHandler(async(req,res)=>{
+  const user=req?.user;
+   if(!user){
+    throw new ApiError(401,"Unauthorized user!please login")
+  }
+   if(user?.role?.trim().toLowerCase()==="retailer"){
+    throw new ApiError(400,"Access-denied retailer not allowed!")
+  }
+  const totalProduct=await Product.countDocuments({})
+   if(totalProduct&&totalProduct.length===0){
+    throw new ApiError(400,"products not found!")
+   }
+   const totalVerified=await Product.countDocuments({isVerified:true})
+   if(!totalVerified&&totalVerified.length===0){
+    throw new ApiError(400,"")
+   }
+   const totalunVerified=await Product.countDocuments({isVerified:false})
+   if(!totalunVerified&&totalunVerified.length===0){
+    throw new ApiError(400,"unVerified Products is empty!")
+   }
+   const totalLowStock=await Product.find({$expr:{$lte:["$stock","$lowStrockAlert"]}})
+   if(!totalLowStock&&totalLowStock.length===0){
+    throw new ApiError(400,"No found low stock!")
+   }
+   const totalCategory=await Product.aggregate([
+    {
+      $group:{
+        _id:"$category",total:{$sum:1}
+      }
+    },
+    {
+      $sort:{total:-1},
+    }
+   ])
+   if(!totalCategory&&totalCategory.length===0){
+    throw new ApiError(400,"No found category!")
+   }
+   return res.status(200).json(new ApiResponse(200,{totalProduct,totalVerified,totalunVerified,totalCategory,totalLowStock},"Product statistics fetched successfully!"))
+})
+// public controller
+const getAllProducts = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, search = "", category, brand } = req.query;
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const filterField = {};
+
+  if (search) {
+    filterField.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { sku: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  if (category?.trim()) filterField.category = category.trim().toLowerCase();
+  if (brand?.trim()) filterField.brand = brand.trim().toLowerCase();
+  filterField.isVerified = true;
+
+  const allProducts = await Product.aggregate([
+    { $match: filterField },
+    {
+      $project:{
+       maxOrderQty:0,
+       minOrderQty:0,
+       lowStockAlert:0,
+       gst:0,updatedBy:0,
+      }
+    },
+    { $sort: { createdAt: -1 } },
+    {
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [{ $skip: skip }, { $limit: Number(limit) }],
+      },
+    },
+  ]);
+
+  const totalProducts = allProducts[0]?.metadata[0]?.total || 0;
+  const products = allProducts[0]?.data || [];
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          currentPage: Number(page),
+          totalPage: Math.ceil(totalProducts / limit),
+          total: totalProducts,
+          products,
+        },
+        "Products fetched successfully!"
+      )
+    );
+});
+const getProductDetails = asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+  if (!slug) throw new ApiError(400, "Slug is required!");
+const validSlug=slug?.replace("-"," ")?.trim()?.toLowerCase();
+console.log(validSlug);
+
+  const product = await Product.findOne({$and:[ {slug:validSlug}, {isVerified: true},]}).select("-minOrderQty -maxOrderQty -lowStockAlert -updatedBy -createdBy");
+
+  if (!product) throw new ApiError(404, "Product not found!");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, product, "Product details fetched successfully!"));
+});
+export { createProduct,updateProductdetails,updateProdImages,removeProduct,getProductByIdOrSlug,getAllProducts,toggleVerify,unVerifiedProducts,allProductsByAdminAndDist,getProductDetails,stockUpdate,lowStock,bulkUploadProducts,stats,bulkdelete};

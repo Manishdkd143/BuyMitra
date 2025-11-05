@@ -7,6 +7,7 @@ import uploadFileOnCloud from "../utils/Cloudinary.js";
 import csv from "csvtojson";
 import deleteFileOnCloud from "../utils/deleteFileOnCloud.js";
 import { ensureCategoryExists } from "../utils/category.helper.js";
+import mongoose from "mongoose";
 const createProduct = asyncHandler(async (req, res) => {
   const isLoggedUser = req?.user;
   if (isLoggedUser?.role?.trim()?.toLowerCase() === "retailer") {
@@ -50,7 +51,7 @@ const createProduct = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields required!");
   }
  const existingProduct= await Product.findOne({$and:[{sku:sku?.trim()?.toUpperCase()},{name:name?.trim()?.toLowerCase()}]})
- if(!existingProduct){
+ if(existingProduct){
   const imagesPathLocal = req.files?.map((file) => file.path);
  imagesPathLocal.map((pathUrl)=>{
   if(fs.existsSync(pathUrl)){
@@ -481,9 +482,26 @@ const bulkUploadProducts=asyncHandler(async(req,res)=>{
       throw new ApiError(400,"file conversion failed!")
     }
     const validProducts=jsonArray.filter((p)=>{
-     return p.name&&p.slug&&p.price&&p.stock
+      const validImageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+       if (!p.name || !p.slug || !p.price || !p.stock || !p.images) {
+        fs.unlinkSync(csvPath)
+    return false;
+  }
+ if(typeof p.images!=='string'){
+    fs.unlinkSync(csvPath)
+  return false
+ }
+ if(!p.images.startsWith("http://")&&!p.images.startsWith("https://")){
+    fs.unlinkSync(csvPath)
+  return false
+ }
+ const hasValidExt=validImageExtensions.some((ext)=>p.images.toLowerCase().endsWith(ext))
+ if(!hasValidExt){
+  return false 
+ }
+ return true
     })
-     if (!validProducts&&!validProducts?.length)
+     if (validProducts?.length===0)
      { 
         fs.unlinkSync(csvPath);
         throw new ApiError(400, "No valid products found in CSV!");
@@ -492,7 +510,7 @@ const bulkUploadProducts=asyncHandler(async(req,res)=>{
     const existing=await Product.find({slug:{$in:slugs}}).select("slug");
     const existingSlugs=new Set(existing.map((p)=>p.slug))
   const newProducts=validProducts.filter((p)=>!existingSlugs.has(p.slug))
-if(!newProducts.length){
+if(newProducts.length===0){
   fs.unlinkSync(csvPath)
   throw new ApiError(409, "All products already exist!")
 }
@@ -508,10 +526,11 @@ if(!newProducts.length){
          if(uploaded?.url) imagesArr.push(uploaded.url)
         }
       }
+      let categoryId=await ensureCategoryExists(p?.category)
       return {
         ...p,
         images:imagesArr,
-        category:await ensureCategoryExists(p?.category)
+        category:categoryId,
       }
       })
     )
@@ -524,8 +543,6 @@ if(!newProducts.length){
   createdBy: user?._id,
   sku: `SKU${Date.now()}${i}`.toUpperCase(),
 }));
-
-    console.log(cleanProducts)
     const insertedProducts= await Product.insertMany(cleanProducts,{ordered:false});
     fs.unlinkSync(csvPath)
     if(!insertedProducts&&!insertedProducts.length){
@@ -596,12 +613,100 @@ const stats=asyncHandler(async(req,res)=>{
     },
     {
       $sort:{total:-1},
-    }
+    },
+    {
+      $facet:{
+        categories:[{$project:{_id:1,total:1}}],
+        totalCatCount:[{$count:"totalCat"}]
+      },
+    
+    },
+    {  $project:{
+        categories:0,
+        total:0
+      }}
    ])
    if(!totalCategory&&totalCategory.length===0){
     throw new ApiError(400,"No found category!")
    }
-   return res.status(200).json(new ApiResponse(200,{totalProduct,totalVerified,totalunVerified,totalCategory,totalLowStock},"Product statistics fetched successfully!"))
+   const totalcat=totalCategory[0]?.totalCatCount[0]?.totalCat;
+   return res.status(200).json(new ApiResponse(200,{totalProduct,totalVerified,totalunVerified,totalcat,totalLowStock},"Product statistics fetched successfully!"))
+})
+const deleteAllProducts=asyncHandler(async(req,res)=>{
+  const isLoggedUser=req.user;
+  if(!isLoggedUser){
+    throw new ApiError(404,"Unauthorized user!please login")
+  }
+  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
+    throw new ApiError(403,"Access-denied retailer not allowed!")
+  }
+  const deleteProducts=await Product.deleteMany({}).populate("category");
+  if(!deleteProducts){
+    throw new ApiError(400,"Products not found!")
+  }
+   return res.status(200).json(new ApiResponse(200,{deletedProducts:deleteProducts.deletedCount,deleteProducts},"All products deleted successfully!"))
+})
+const bulkVerify=asyncHandler(async(req,res)=>{
+  const isLoggedUser=req.user;
+  if(!isLoggedUser){
+    throw new ApiError(404,"Unauthorized user!please login")
+  }
+  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
+    throw new ApiError(403,"Access-denied retailer not allowed!")
+  }
+ const {ids}=req.body;
+ const validIds=[];
+ const inValidIds=[];
+ ids.forEach((id)=>{
+  if(mongoose.isValidObjectId(id)){
+    validIds.push(id)
+  }else {
+    inValidIds.push(id)
+  }
+ })
+ if(validIds.length===0){
+  throw new ApiError(400,"No valid product IDs provided!")
+ }
+  const updatePromises= validIds.map((id)=>
+     Product.findByIdAndUpdate(id,{
+      $set:{
+        isVerified:true
+      }
+    },
+  {
+    new:true,
+    runValidators:true,
+  }).select("name slug isVerified")
+  )
+  const result=await Promise.allSettled(updatePromises)
+  const successUpdate=[];
+  const failedUpdate=[];
+  result.forEach((res,i)=>{
+    if(res.status==="fulfilled"&&res.value){
+      successUpdate.push(res.value)
+    }else{
+      failedUpdate.push({
+        id:validIds[i],
+        reason:res.reason?.message||"Product not found",
+      })
+    }
+  })
+    if (successUpdate.length === 0) {
+      throw new ApiError(404, "No products found with given IDs!");
+    }
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          verifiedCount: successUpdate.length,
+          products: successUpdate,
+          failed: failedUpdate,
+          invalidIds: inValidIds
+        },
+        `${successUpdate.length} product(s) verified successfully`
+      )
+    );
 })
 // public controller
 const getAllProducts = asyncHandler(async (req, res) => {
@@ -672,4 +777,5 @@ console.log(validSlug);
     .status(200)
     .json(new ApiResponse(200, product, "Product details fetched successfully!"));
 });
-export { createProduct,updateProductdetails,updateProdImages,removeProduct,getProductByIdOrSlug,getAllProducts,toggleVerify,unVerifiedProducts,allProductsByAdminAndDist,getProductDetails,stockUpdate,lowStock,bulkUploadProducts,stats,bulkdelete};
+
+export { createProduct,updateProductdetails,updateProdImages,removeProduct,getProductByIdOrSlug,getAllProducts,toggleVerify,unVerifiedProducts,allProductsByAdminAndDist,deleteAllProducts,getProductDetails,stockUpdate,lowStock,bulkUploadProducts,stats,bulkdelete,bulkVerify};

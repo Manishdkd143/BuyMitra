@@ -1,5 +1,6 @@
 import {v2 as cloudinary} from "cloudinary";
 import fs from "fs";
+import { ApiError } from "./ApiError.js";
 cloudinary.config({
     cloud_name:process.env.CLOUDINARY_NAME,
     api_key:process.env.CLOUDINARY_API_KEY,
@@ -7,7 +8,9 @@ cloudinary.config({
 })
 const uploadFileOnCloud=async(localFilePath)=>{
     try {
+     
         if(!localFilePath) return null;
+
         const response=await cloudinary.uploader.upload(localFilePath,{
             resource_type:'auto',
         })

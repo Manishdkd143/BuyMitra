@@ -3,6 +3,8 @@ const categorySchema=new Schema({
     name:{
         type:String,
         required:true,
+        trim:true,
+        unique:true,
     },
     slug:{type:String},
     description:{type:String},

@@ -1,7 +1,7 @@
 import Router from "express"
 import { isAdmin, isAdminOrDistributor } from "../middleware/role.middleware.js";
 import verifyJWT from "../middleware/auth.middleware.js";
-import { allProductsByAdminAndDist, bulkdelete, bulkUploadProducts, createProduct, getAllProducts, getProductByIdOrSlug, getProductDetails, lowStock, removeProduct, stats, stockUpdate, toggleVerify, unVerifiedProducts, updateProdImages, updateProductdetails } from "../controllers/product.controller.js";
+import { allProductsByAdminAndDist, bulkdelete, bulkUploadProducts, bulkVerify, createProduct, deleteAllProducts, getAllProducts, getProductByIdOrSlug, getProductDetails, lowStock, removeProduct, stats, stockUpdate, toggleVerify, unVerifiedProducts, updateProdImages, updateProductdetails } from "../controllers/product.controller.js";
 import { Upload } from "../middleware/multer.middleware.js";
 const router=Router();
 //public routes
@@ -17,9 +17,10 @@ router.route("/unverified").get(verifyJWT,isAdminOrDistributor,unVerifiedProduct
 router.route("/c/product").get(verifyJWT,isAdminOrDistributor,getProductByIdOrSlug)
 router.route("/stock/:productId").patch(verifyJWT,isAdminOrDistributor,stockUpdate)
 router.route("/lowStock").get(verifyJWT,isAdminOrDistributor,lowStock)
-
+router.route("/alldelete").post(verifyJWT,isAdminOrDistributor,deleteAllProducts)
 router.route("/bulkdelete").post(verifyJWT,isAdminOrDistributor,bulkdelete)
 router.route("/uploadfile").post(verifyJWT,isAdminOrDistributor,Upload.single("csvfile"),bulkUploadProducts)
+router.route("/bulkVerify").post(verifyJWT,isAdminOrDistributor,bulkVerify)
 //Admin
 router.route("/all").get(verifyJWT,isAdminOrDistributor,allProductsByAdminAndDist)
 router.route("/stats").get(verifyJWT,isAdminOrDistributor,stats)

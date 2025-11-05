@@ -2,12 +2,21 @@ import { Category } from "../models/category.model.js";
 import { ApiError } from "./ApiError.js";
 
 const ensureCategoryExists=async(categoryName)=>{
-    if(!categoryName) throw new ApiError(400,"category is required!");
-    const normalizeCategory=categoryName?.trim().toLowerCase();
-    let category=await Category.findOne({name:normalizeCategory})
-    if(!category){
-        category=await Category.create({name:normalizeCategory})
+    if(!categoryName||typeof categoryName!=="string"){
+     throw new ApiError(400,"Valid category name is required!")
     }
-     return category;
+    const normalizedName=categoryName.trim().toLowerCase()
+   if(!normalizedName){
+       throw new ApiError(400, "Category name cannot be empty!");
+   }
+  const category= await Category.findOneAndUpdate({name:normalizedName},{
+     $setOnInsert:{name:normalizedName},
+   },
+{
+     new:true,
+     upsert:true,
+     runValidators:true,
+}).select("_id")
+return category._id;
 }
 export {ensureCategoryExists}

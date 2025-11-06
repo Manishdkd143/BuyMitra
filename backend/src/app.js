@@ -16,13 +16,14 @@ app.use(cookieParser());
 import userRouter from "./routes/user.routes.js"
 import adminRouter from "./routes/admin.routes.js"
 import productRouter from "./routes/product.routes.js"
-
+import categoryRouter  from "./routes/category.routes.js"
 
 
 app.use('/api/v1/auth',userRouter);
 app.use('/api/v1/users',userRouter);
 app.use('/api/v1/admin',adminRouter);
 app.use('/api/v1/products',productRouter);
+app.use('/api/v1/categories',categoryRouter);
 
 
 

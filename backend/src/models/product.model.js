@@ -107,4 +107,20 @@ productSchema.pre("save",function(next){
    }
    next()
 })
+productSchema.pre("findOneAndUpdate",function(next){
+const  update=this.getUpdate();
+let name=update.name||update.$set?.name;
+if(name){
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .trim();
+      if(update.$set){
+        update.$set.slug=slug
+      }else{
+        update.slug=slug;
+      }
+}
+})
 export const Product=mongoose.model("Product",productSchema)

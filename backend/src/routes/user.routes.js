@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { deleteProfilePic, forgotPassword, getCurrentUser, refreshAccessToken, removeAccount, resetPassword, updatePassword, updateProfilePic, updateUserdetails, userLogin, userLogout, userRegister } from "../controllers/user.controller.js";
+import { applyForDistributor, deleteProfilePic, forgotPassword, getCurrentUser, refreshAccessToken, removeAccount, resetPassword, updatePassword, updateProfilePic, updateUserdetails, userLogin, userLogout, userRegister } from "../controllers/user.controller.js";
 import { Upload } from "../middleware/multer.middleware.js";
 import verifyJWT from "../middleware/auth.middleware.js";
 const router=Router();
@@ -15,4 +15,8 @@ router.route("/updateinfo").post(verifyJWT,updateUserdetails)
 router.route("/refresh-token").post(refreshAccessToken)
 router.route("/forgotpassword").post(forgotPassword)
 router.route("/reset-password/:token").post(resetPassword)
+router.route("/apply-distributor").post(verifyJWT,Upload.fields([
+    {name:"gstCertificate",maxCount:1},
+    {name:"businessProof",maxCount:1},
+]),applyForDistributor)
 export default router

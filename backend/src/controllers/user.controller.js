@@ -7,6 +7,7 @@ import {ApiResponse} from "../utils/ApiResponse.js";
 import deleteFileOnCloud from "../utils/deleteFileOnCloud.js";
 import SHA256 from "crypto-js/sha256.js";
 import fs from "fs"
+import { DistributorProfile } from "../models/distributorProfile.model.js";
 
 const generatedAccessAndRefreshToken=async(userId)=>{
   try {
@@ -37,36 +38,44 @@ const userRegister=asyncHandler(async(req,res)=>{
     */
 //    console.log(req.body);
    
-   const {name,email,password,phone,role,address,gender}=req.body;
+   const {name,email,password,phone,role="retailer",gender}=req.body;
   if([name,email,password,phone,gender,role].some((field)=>!field)){
     fs.unlinkSync(req.file?.path)
     throw new ApiError(401,"All fields required!")
   }
   const exists=await User.findOne({email:email.toLowerCase()})
   if(exists){
-    fs.unlinkSync(req.file?.path)
+     if(req.file?.path){
+        fs.unlinkSync(req.file?.path)
+      }
     throw new ApiError(409,"User already registered!")
   }
-  if(role.trim().toLowerCase()==="admin") 
-  {
-     fs.unlinkSync(req.file?.path)
-  throw new ApiError(403, "Cannot create admin user")
-  }
-   const picLocalPath= req.file?.path;
-    if(!picLocalPath){
-          throw new ApiError(400, "Profile picture file is required!");
+ if(role?.trim().toLowerCase()==="admin"){
+ const existingAdmin= await User.findOne({role:"admin"});
+     if (existingAdmin) {
+      if(req.file?.path){
+        fs.unlinkSync(req.file?.path)
+      }
+        throw new ApiError(403, "Admin already exists! Only one admin is allowed.");
     }
-    const uploadedPic=await uploadFileOnCloud(picLocalPath);
+
+ }
+  let uploadedPic=null;
+   if(req.file?.path){
+    const picLocalPath=req.file?.path
+    uploadedPic=await uploadFileOnCloud(picLocalPath);
     if(!uploadedPic){
           throw new ApiError(500, "File upload failed! Please try again.");
     }
+   }
+   
     const newUser = await User.create({
     name: name.trim().toLowerCase(),
     email: email.trim().toLowerCase(),
     password,
     phone: phone.trim(),
     role: role ? role.trim().toLowerCase() : "retailer",
-    profilePic: uploadedPic.url,
+    profilePic: uploadedPic?.url||null,
     gender: gender.trim().toLowerCase(),
   });
     if(!newUser){
@@ -86,7 +95,7 @@ const userLogin=asyncHandler(async(req,res)=>{
      if(!password){
         throw new ApiError(401,"Password is required!")
     }
-    const user=await User.findOne({email});
+    const user=await User.findOne({email:email?.trim().toLowerCase()});
     if(!user){
         throw new ApiError(404,"User not exists!please register")
     }
@@ -345,6 +354,63 @@ const resetPassword=asyncHandler(async(req,res)=>{
   await user.save({validateBeforeSave:true})
   return res.status(200).json(new ApiResponse(200,{},"Password updated successfully"))
 })
+const applyForDistributor=asyncHandler(async(req,res)=>{
+  const isLoggedUser=req.user;
+  if(!isLoggedUser){
+    throw new ApiError(401,"Unauthorized user!please login")
+  }
+  const {
+    businessName, gstNumber,phone, address, city, state, pincode
+  }=req.body;
+  if([businessName,phone,address,city,state,pincode].some((field=>!field))){
+    throw new ApiError(400,"All field fill required!")
+  }
+  if(isLoggedUser.role==="admin"){
+    throw new ApiError(401,"Admin no required for this role!")
+  }
+  const existingApplication=await DistributorProfile.findOne({userId:isLoggedUser._id});
+    if (existingApplication) {
+        if (existingApplication.status === "pending") {
+            throw new ApiError(400, "Application already submitted and pending review!");
+        }
+        if (existingApplication.status === "approved") {
+            throw new ApiError(400, "You are already a distributor!");
+        }
+    }
+    const documents=[];
+     if (req.files?.gstCertificate?.[0]) {
+        const gstDoc = await uploadFileOnCloud(req.files.gstCertificate[0].path);
+        if (gstDoc) {
+            documents.push({ docType: "gst_certificate", url: gstDoc.url });
+        }
+    }
+    
+    if (req.files?.businessProof?.[0]) {
+        const businessDoc = await uploadFileOnCloud(req.files.businessProof[0].path);
+        if (businessDoc) {
+            documents.push({ docType: "business_proof", url: businessDoc.url });
+        }
+    }
+    let addressFields={};
+    if(city&&city!==undefined) addressFields.city=city?.trim().toLowerCase();
+    if(state&&state!==undefined) addressFields.state=state?.trim().toLowerCase();
+    if(!isNaN(pincode))addressFields.pincode=Number(pincode);
+    const application=await DistributorProfile.create({
+      userId:isLoggedUser._id,
+      businessName:businessName?.trim().toLowerCase(),
+      gstNumber:gstNumber||null,
+      businessPhone:Number(phone),
+      businessAddress:addressFields,
+      documents: documents.length > 0 ? documents : undefined,
+
+    })
+    if(!application){
+      throw new ApiError(404,"Application submition failed!")
+    }
+       return res.status(201).json(
+        new ApiResponse(201, application, "Application submitted successfully! Admin will review soon.")
+    );
+})
 
 
-export {userRegister,userLogin,userLogout,getCurrentUser,updatePassword,updateProfilePic,updateUserdetails,refreshAccessToken,removeAccount,deleteProfilePic,forgotPassword,resetPassword}
+export {userRegister,userLogin,userLogout,getCurrentUser,updatePassword,updateProfilePic,updateUserdetails,refreshAccessToken,removeAccount,deleteProfilePic,forgotPassword,resetPassword,applyForDistributor}

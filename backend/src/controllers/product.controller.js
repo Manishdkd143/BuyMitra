@@ -655,6 +655,9 @@ const bulkVerify=asyncHandler(async(req,res)=>{
     throw new ApiError(403,"Access-denied retailer not allowed!")
   }
  const {ids}=req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new ApiError(400, "At least one cart ID is required!");
+  }
  const validIds=[];
  const inValidIds=[];
  ids.forEach((id)=>{
@@ -669,19 +672,22 @@ const bulkVerify=asyncHandler(async(req,res)=>{
  }
   const updatePromises= validIds.map((id)=>
      Product.findByIdAndUpdate(id,{
-      $set:{
-        isVerified:true
-      }
+      isVerified:true
     },
   {
     new:true,
     runValidators:true,
-  }).select("name slug isVerified")
+  })
   )
+  // console.log("update",updatePromises)
   const result=await Promise.allSettled(updatePromises)
+  console.log("res",result)
   const successUpdate=[];
   const failedUpdate=[];
+  
   result.forEach((res,i)=>{
+    console.log("response",res);
+    
     if(res.status==="fulfilled"&&res.value){
       successUpdate.push(res.value)
     }else{

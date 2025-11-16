@@ -1,0 +1,51 @@
+name,slug,brand,category,price,stock,lowStockAlert,description,images
+Tata Salt,tata-salt,Tata,Groceries,20,100,10,Refined iodized salt,https://res.cloudinary.com/demo/image/upload/tata-salt.jpg
+Amul Milk,amul-milk,Amul,Dairy,30,50,5,Fresh cow milk 500ml,https://res.cloudinary.com/demo/image/upload/amul-milk.jpg
+Parle G,parle-g,Parle,Biscuits,10,200,20,Glucose biscuits,https://res.cloudinary.com/demo/image/upload/parle-g.jpg
+Surf Excel,surf-excel,HUL,Detergent,250,40,5,Powerful washing detergent,https://res.cloudinary.com/demo/image/upload/surf-excel.jpg
+Colgate,colgate,Colgate,OralCare,60,120,15,Freshness toothpaste 200gm,https://res.cloudinary.com/demo/image/upload/colgate.jpg
+Maggi Noodles,maggi-noodles,Nestle,Instant Food,14,150,25,Masala instant noodles 70gm,https://res.cloudinary.com/demo/image/upload/maggi-noodles.jpg
+Britannia Bread,britannia-bread,Britannia,Bakery,40,80,10,Whole wheat bread 400gm,https://res.cloudinary.com/demo/image/upload/britannia-bread.jpg
+Dove Soap,dove-soap,HUL,Personal Care,45,90,12,Moisturizing beauty soap,https://res.cloudinary.com/demo/image/upload/dove-soap.jpg
+Lifebuoy Soap,lifebuoy-soap,HUL,Personal Care,35,110,15,Germ protection soap,https://res.cloudinary.com/demo/image/upload/lifebuoy-soap.jpg
+Lux Soap,lux-soap,HUL,Personal Care,38,95,10,Fragrant beauty soap,https://res.cloudinary.com/demo/image/upload/lux-soap.jpg
+Red Label Tea,red-label-tea,Brooke Bond,Beverages,180,60,8,Premium black tea 500gm,https://res.cloudinary.com/demo/image/upload/red-label-tea.jpg
+Tata Tea Gold,tata-tea-gold,Tata,Beverages,220,55,7,Pure leaf tea 500gm,https://res.cloudinary.com/demo/image/upload/tata-tea-gold.jpg
+Nescafe Coffee,nescafe-coffee,Nestle,Beverages,350,45,6,Classic instant coffee 50gm,https://res.cloudinary.com/demo/image/upload/nescafe-coffee.jpg
+Bru Coffee,bru-coffee,HUL,Beverages,280,50,8,Pure coffee powder 100gm,https://res.cloudinary.com/demo/image/upload/bru-coffee.jpg
+Sunfeast Biscuits,sunfeast-biscuits,ITC,Biscuits,25,180,20,Marie light biscuits,https://res.cloudinary.com/demo/image/upload/sunfeast-biscuits.jpg
+Good Day Cookies,good-day-cookies,Britannia,Biscuits,30,160,18,Butter cookies 100gm,https://res.cloudinary.com/demo/image/upload/good-day-cookies.jpg
+Cadbury Dairy Milk,cadbury-dairy-milk,Mondelez,Chocolates,50,200,25,Milk chocolate 45gm,https://res.cloudinary.com/demo/image/upload/cadbury-dairy-milk.jpg
+KitKat,kitkat,Nestle,Chocolates,20,250,30,Crispy wafer chocolate,https://res.cloudinary.com/demo/image/upload/kitkat.jpg
+5 Star,5-star,Mondelez,Chocolates,10,300,35,Caramel chocolate bar,https://res.cloudinary.com/demo/image/upload/5-star.jpg
+Perk,perk,Mondelez,Chocolates,10,280,32,Wafer chocolate 14gm,https://res.cloudinary.com/demo/image/upload/perk.jpg
+Lays Chips,lays-chips,PepsiCo,Snacks,20,220,28,Classic salted chips 50gm,https://res.cloudinary.com/demo/image/upload/lays-chips.jpg
+Kurkure,kurkure,PepsiCo,Snacks,10,240,30,Masala munch snacks,https://res.cloudinary.com/demo/image/upload/kurkure.jpg
+Haldiram Namkeen,haldiram-namkeen,Haldiram,Snacks,40,130,15,Aloo bhujia 200gm,https://res.cloudinary.com/demo/image/upload/haldiram-namkeen.jpg
+Bikaji Bhujia,bikaji-bhujia,Bikaji,Snacks,35,140,16,Traditional bhujia 150gm,https://res.cloudinary.com/demo/image/upload/bikaji-bhujia.jpg
+Fortune Oil,fortune-oil,Adani Wilmar,Cooking Oil,180,70,8,Refined sunflower oil 1L,https://res.cloudinary.com/demo/image/upload/fortune-oil.jpg
+Saffola Oil,saffola-oil,Marico,Cooking Oil,220,65,7,Heart healthy oil 1L,https://res.cloudinary.com/demo/image/upload/saffola-oil.jpg
+India Gate Basmati,india-gate-basmati,KRBL,Rice,250,90,10,Premium basmati rice 1kg,https://res.cloudinary.com/demo/image/upload/india-gate-basmati.jpg
+Dawat Basmati,dawat-basmati,LT Foods,Rice,230,95,11,Classic basmati rice 1kg,https://res.cloudinary.com/demo/image/upload/dawat-basmati.jpg
+Aashirvaad Atta,aashirvaad-atta,ITC,Flour,220,110,12,Whole wheat flour 5kg,https://res.cloudinary.com/demo/image/upload/aashirvaad-atta.jpg
+Pillsbury Atta,pillsbury-atta,General Mills,Flour,210,115,13,Chakki fresh atta 5kg,https://res.cloudinary.com/demo/image/upload/pillsbury-atta.jpg
+Toor Dal,toor-dal,Fortune,Pulses,140,100,12,Split pigeon peas 1kg,https://res.cloudinary.com/demo/image/upload/toor-dal.jpg
+Moong Dal,moong-dal,Fortune,Pulses,160,105,13,Split green gram 1kg,https://res.cloudinary.com/demo/image/upload/moong-dal.jpg
+Chana Dal,chana-dal,Fortune,Pulses,120,110,14,Split chickpeas 1kg,https://res.cloudinary.com/demo/image/upload/chana-dal.jpg
+Masoor Dal,masoor-dal,Fortune,Pulses,130,108,12,Red lentils 1kg,https://res.cloudinary.com/demo/image/upload/masoor-dal.jpg
+MDH Masala,mdh-masala,MDH,Spices,50,180,20,Garam masala powder 100gm,https://res.cloudinary.com/demo/image/upload/mdh-masala.jpg
+Everest Masala,everest-masala,Everest,Spices,45,185,22,Red chilli powder 100gm,https://res.cloudinary.com/demo/image/upload/everest-masala.jpg
+Catch Masala,catch-masala,DS Group,Spices,40,190,24,Turmeric powder 100gm,https://res.cloudinary.com/demo/image/upload/catch-masala.jpg
+Rajnigandha,rajnigandha,DS Group,Mouth Freshener,10,350,40,Silver pearls pack,https://res.cloudinary.com/demo/image/upload/rajnigandha.jpg
+Pass Pass,pass-pass,DS Group,Mouth Freshener,5,400,45,Pulse candy pack,https://res.cloudinary.com/demo/image/upload/pass-pass.jpg
+Clinic Plus,clinic-plus,HUL,Hair Care,180,75,9,Strong & long shampoo 340ml,https://res.cloudinary.com/demo/image/upload/clinic-plus.jpg
+Pantene,pantene,P&G,Hair Care,220,70,8,Pro-V shampoo 340ml,https://res.cloudinary.com/demo/image/upload/pantene.jpg
+Head & Shoulders,head-shoulders,P&G,Hair Care,280,65,7,Anti-dandruff shampoo 340ml,https://res.cloudinary.com/demo/image/upload/head-shoulders.jpg
+Parachute Oil,parachute-oil,Marico,Hair Care,90,150,18,Pure coconut oil 200ml,https://res.cloudinary.com/demo/image/upload/parachute-oil.jpg
+Dabur Amla,dabur-amla,Dabur,Hair Care,85,155,19,Amla hair oil 200ml,https://res.cloudinary.com/demo/image/upload/dabur-amla.jpg
+Fair & Lovely,fair-lovely,HUL,Skin Care,120,95,12,Advanced cream 50gm,https://res.cloudinary.com/demo/image/upload/fair-lovely.jpg
+Ponds Cream,ponds-cream,HUL,Skin Care,140,90,11,Cold cream 100ml,https://res.cloudinary.com/demo/image/upload/ponds-cream.jpg
+Vaseline,vaseline,HUL,Skin Care,100,110,13,Petroleum jelly 100ml,https://res.cloudinary.com/demo/image/upload/vaseline.jpg
+Dettol Soap,dettol-soap,Reckitt,Personal Care,40,130,16,Original antiseptic soap,https://res.cloudinary.com/demo/image/upload/dettol-soap.jpg
+Savlon Soap,savlon-soap,ITC,Personal Care,35,135,17,Germ protection soap,https://res.cloudinary.com/demo/image/upload/savlon-soap.jpg
+Vim Bar,vim-bar,HUL,Cleaning,10,250,30,Dishwash bar 300gm,https://res.cloudinary.com/demo/image/upload/vim-bar.jpg

@@ -1,3 +1,5 @@
+import { application } from "express";
+import { DistributorProfile } from "../models/distributorProfile.model.js";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -148,6 +150,21 @@ const getAllApprovedUser=asyncHandler(async(req,res)=>{
      }
      return res.status(200).json(new ApiResponse(200,allApprovedUser,"All approved user fetched!"))
 })
+const getAllApprovedDistributor=asyncHandler(async(req,res)=>{
+    const isLoggedUser=req?.user;
+    if(!isLoggedUser){
+        throw new ApiError(401,"Unauthorized user!please login")
+    }
+    if(isLoggedUser.role!=="admin"){
+        throw new ApiError(403,"Access-denied only admin allowed!")
+    }
+   const approvedDist= await DistributorProfile.find({status:"approved"}).populate("userId","name email phone profilePic").sort({createdAt:-1})
+   if(!approvedDist){
+    throw new ApiError(404,"Approved distributor not found!")
+   }
+   return res.status(200).json(new ApiResponse(200,approvedDist,"all approved distributor fetched successfully"))
+
+})
 const getUnApprovedUser=asyncHandler(async(req,res)=>{
      const isLoggedUser=req?.user;
     if(isLoggedUser?.role.toLowerCase()!=="admin"){
@@ -164,4 +181,79 @@ const getUnApprovedUser=asyncHandler(async(req,res)=>{
      }
      return res.status(200).json(new ApiResponse(200,unApproved,"Unapproved users fetched successfully!"))
 })
-export {getAllUser,getUserById,changeUserRole,deleteAnyAccount,approvalUser,getAllApprovedUser,getUnApprovedUser}
+
+//getPendingApplication,approveDistributor,rejectDistributor
+const getPendingApplication=asyncHandler(async(req,res)=>{
+   const {status="pending",page=1,limit=10}=req.query;
+  const skip=(Number(page)-1)*Number(limit)
+   const applications=await DistributorProfile.find({status:status}).populate("userId","name email phone profilePic").skip(skip).limit(limit).sort({createdAt:-1})
+   return res.status(200).json(
+        new ApiResponse(200, applications, "Applications fetched successfully")
+    );
+})
+const approveDistributor=asyncHandler(async(req,res)=>{
+    const {applicationId}=req.params;
+    if(!applicationId){
+        throw new ApiError(404,"application id required!")
+    }
+   const application= await DistributorProfile.findById(applicationId)
+   if(!application){
+    throw new ApiError(404,"Application not found!")
+   }
+   if(application.status!=="pending"){
+    throw new ApiError(403,"Application already reviewed!")
+   }
+   application.status="approved";
+   application.approval.isApproved=true;
+   application.approval.approvedBy=req.user._id;
+   application.approval.approvedAt= Date.now();
+   application.approval.reviewedBy=req?.user._id;
+   await application.save()
+   await User.findByIdAndUpdate(application.userId,{
+    role:"distributor"
+   })
+   return res.status(200).json(
+        new ApiResponse(200, application, "Distributor approved successfully!")
+    );
+})
+const rejectDistributor=asyncHandler(async(req,res)=>{
+    const {applicationId}=req.params;
+    const {reason}=req.body;
+    if(!reason||reason===""){
+   throw new ApiError(400,"Reason is empty!")
+    }
+   const application= await DistributorProfile.findById(applicationId);
+   if(!application){
+    throw new ApiError(404,"distributor not found!")
+   }
+   if(application.status!=="pending"){
+    throw new ApiError(400,"distributor already reviewed")
+   }
+   application.status="rejected";
+   application.approval.isApproved=false;
+   application.approval.rejectionReason=reason||undefined,
+   application.approval.rejectedAt=Date.now()
+   application.approval.reviewedBy=req?.user._id;
+   await application.save();
+     return res.status(200).json(
+        new ApiResponse(200, application, "Application rejected!")
+    );
+})
+const getAllRejectedDistributor=asyncHandler(async(req,res)=>{
+    const {status="rejected"}=req.query;
+    const isLoggedUser=req.user;
+    if(!isLoggedUser){
+        throw new ApiError(401,"Unauthorization user!please login")
+    }
+    if(isLoggedUser.role!=="admin"){
+        throw new ApiError(403,"Access-denied only admin allowed!")
+    }
+  
+    const rejectedDistributor= await DistributorProfile.find({status:status?.trim().toLowerCase()}).populate("userId","name email phone profilePic").sort({createdAt:-1})
+    if(!rejectedDistributor){
+        throw new ApiError(404,"Rejected distributor not found!")
+    }
+    return res.status(200).json(new ApiResponse(200,rejectedDistributor,"all rejected distributor fetched successfully!"))
+})
+
+export {getAllUser,getUserById,changeUserRole,deleteAnyAccount,approvalUser,getAllApprovedUser,getUnApprovedUser,getPendingApplication,approveDistributor,rejectDistributor,getAllApprovedDistributor,getAllRejectedDistributor}

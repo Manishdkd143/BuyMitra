@@ -108,15 +108,15 @@ const userLogin=asyncHandler(async(req,res)=>{
     throw new ApiError(401,"Tokens is empty!");
    }
    const isLoggedUser=await User.findById(user._id).select("-password -refreshToken")
+
    const options={
     httpOnly:true,
     secure:true,
    }
-
    return res.status(200)
    .cookie('refreshToken',refreshToken,options)
    .cookie('accessToken',accessToken,options)
-   .json(new ApiResponse(200,{user:isLoggedUser,accessToken},"User Logged successfully!"))
+   .json(new ApiResponse(200,{user:isLoggedUser,accessToken,distributorId:isLoggedUser.role.toLowerCase()==="distributor"?isLoggedUser._id:null},"User Logged successfully!"))
 })
 const userLogout=asyncHandler(async(req,res)=>{
     const user=req.user;

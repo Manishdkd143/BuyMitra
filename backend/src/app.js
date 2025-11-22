@@ -19,7 +19,7 @@ import productRouter from "./routes/product.routes.js"
 import categoryRouter  from "./routes/category.routes.js"
 import cartRouter from "./routes/cart.routes.js"
 import addressRouter from "./routes/address.routes.js"
-
+import distributorRouter from "./routes/distributor.routes.js"
 
 app.use('/api/v1/auth',userRouter);
 app.use('/api/v1/users',userRouter);
@@ -28,5 +28,7 @@ app.use('/api/v1/products',productRouter);
 app.use('/api/v1/categories',categoryRouter);
 app.use('/api/v1/carts',cartRouter);
 app.use('/api/v1/address',addressRouter);
+app.use('/api/v1/distributors',distributorRouter);
+
 
 export {app}

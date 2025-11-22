@@ -285,8 +285,7 @@ const removeProduct=asyncHandler(async(req,res)=>{
   return res.status(200).json(new ApiResponse(200,deletedProduct,"Product deleted successfully!"))
 })
 const getProductByIdOrSlug=asyncHandler(async(req,res)=>{
-  console.log(req.query);
-  
+
    const {slug,productId}=req.query;
    if(!slug&&!productId){
       throw new ApiError(400,"Either slug or product id is required!")
@@ -331,7 +330,9 @@ const unVerifiedProducts=asyncHandler(async(req,res)=>{
   }
    const unVerified=await Product.aggregate([
     {
-      $match:{isVerified:false}
+      $match:{isVerified:false,
+        createdBy:req?.user._id,
+      }
     },
     {
       $facet:{
@@ -476,7 +477,10 @@ const bulkUploadProducts=asyncHandler(async(req,res)=>{
     throw new ApiError(400,"file is required!")
   }
   const csvPath=req.file?.path
+  
     const jsonArray=await csv().fromFile(csvPath);
+    console.log("json",jsonArray);
+    
     if(!jsonArray&&!jsonArray?.length){
       fs.unlinkSync(csvPath)
       throw new ApiError(400,"file conversion failed!")
@@ -491,10 +495,10 @@ const bulkUploadProducts=asyncHandler(async(req,res)=>{
     fs.unlinkSync(csvPath)
   return false
  }
- if(!p.images.startsWith("http://")&&!p.images.startsWith("https://")){
-    fs.unlinkSync(csvPath)
-  return false
- }
+//  if(!p.images.startsWith("http://")&&!p.images.startsWith("https://")){
+//     fs.unlinkSync(csvPath)
+//   return false
+//  }
  const hasValidExt=validImageExtensions.some((ext)=>p.images.toLowerCase().endsWith(ext))
  if(!hasValidExt){
   return false 
@@ -510,12 +514,16 @@ const bulkUploadProducts=asyncHandler(async(req,res)=>{
     const existing=await Product.find({slug:{$in:slugs}}).select("slug");
     const existingSlugs=new Set(existing.map((p)=>p.slug))
   const newProducts=validProducts.filter((p)=>!existingSlugs.has(p.slug))
+  console.log("newProd",newProducts.length);
+  
 if(newProducts.length===0){
   fs.unlinkSync(csvPath)
   throw new ApiError(409, "All products already exist!")
 }
     const productsWithImages=await  Promise.all(
       newProducts.map(async(p)=>{
+        console.log(p);
+        
         let imagesArr=[];
       if(p?.images){
           if(p.images?.startsWith("http")){
@@ -523,10 +531,14 @@ if(newProducts.length===0){
           }
         else{
          const uploaded= await uploadFileOnCloud(p.images);
+         console.log(p.images);
+         
          if(uploaded?.url) imagesArr.push(uploaded.url)
         }
       }
       let categoryId=await ensureCategoryExists(p?.category)
+      console.log(imagesArr);
+      
       return {
         ...p,
         images:imagesArr,
@@ -534,6 +546,8 @@ if(newProducts.length===0){
       }
       })
     )
+    console.log("productWithImage",productsWithImages);
+    
     const cleanProducts = productsWithImages.map((p, i) => ({
   ...p,
   price: Number(p.price) || 0,
@@ -543,6 +557,8 @@ if(newProducts.length===0){
   createdBy: user?._id,
   sku: `SKU${Date.now()}${i}`.toUpperCase(),
 }));
+console.log("clean",cleanProducts);
+
     const insertedProducts= await Product.insertMany(cleanProducts,{ordered:false});
     fs.unlinkSync(csvPath)
     if(!insertedProducts&&!insertedProducts.length){
@@ -589,7 +605,7 @@ const stats=asyncHandler(async(req,res)=>{
    if(user?.role?.trim().toLowerCase()==="retailer"){
     throw new ApiError(400,"Access-denied retailer not allowed!")
   }
-  const totalProduct=await Product.countDocuments({})
+  const totalProduct=await Product.countDocuments({createdBy:user._id})
    if(totalProduct&&totalProduct.length===0){
     throw new ApiError(400,"products not found!")
    }
@@ -671,23 +687,19 @@ const bulkVerify=asyncHandler(async(req,res)=>{
   throw new ApiError(400,"No valid product IDs provided!")
  }
   const updatePromises= validIds.map((id)=>
-     Product.findByIdAndUpdate(id,{
-      isVerified:true
+        Product.findByIdAndUpdate(id,{
+     isVerified:true,
     },
   {
     new:true,
     runValidators:true,
   })
   )
-  // console.log("update",updatePromises)
   const result=await Promise.allSettled(updatePromises)
-  console.log("res",result)
   const successUpdate=[];
   const failedUpdate=[];
   
   result.forEach((res,i)=>{
-    console.log("response",res);
-    
     if(res.status==="fulfilled"&&res.value){
       successUpdate.push(res.value)
     }else{
@@ -700,7 +712,6 @@ const bulkVerify=asyncHandler(async(req,res)=>{
     if (successUpdate.length === 0) {
       throw new ApiError(404, "No products found with given IDs!");
     }
-
     return res.status(200).json(
       new ApiResponse(
         200,

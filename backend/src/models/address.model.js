@@ -9,6 +9,7 @@ const addressSchema = new Schema({
     },
     fullName: {
         type: String,
+        set: (val) => val?.replace(/\s+/g, ''),
         required: [true, "Full name is required"],
         trim: true,
         minlength: [3, "Full name must be at least 3 characters"],
@@ -49,6 +50,7 @@ const addressSchema = new Schema({
     },
     city: {
         type: String,
+        set: (val) => val?.replace(/\s+/g, ''),
         required: [true, "City is required"],
         trim: true,
         minlength: [2, "City name must be at least 2 characters"],
@@ -56,6 +58,7 @@ const addressSchema = new Schema({
     },
     state: {
         type: String,
+        set: (val) => val?.replace(/\s+/g, ''),
         required: [true, "State is required"],
         trim: true,
         minlength: [2, "State name must be at least 2 characters"],
@@ -89,7 +92,6 @@ const addressSchema = new Schema({
     isDefault: { 
         type: Boolean,
         default: false,  
-        index: true,
     }
 }, {
     timestamps: true

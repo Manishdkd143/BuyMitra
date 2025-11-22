@@ -51,4 +51,11 @@ const addAddress=asyncHandler(async(req,res)=>{
    }
    res.status(200).json(new ApiResponse(200,newAddress,"New address successfully added"))
 })
+const updateAddress=asyncHandler(async(req,res)=>{
+    const isLoggedUser=req.user;
+    if(!isLoggedUser){
+        throw new ApiError(401,"Unauthorized user!please login")
+    }
+    
+})
 export {addAddress}

@@ -406,6 +406,8 @@ const calculateShipping=asyncHandler(async(req,res)=>{
         _id:addressId,
         userId:isLoggedUser._id,
       })
+      console.log(address);
+      
   if(!address){
     throw new ApiError(404,"Address not found or unauthorized!")
   }
@@ -438,11 +440,14 @@ const calculateShipping=asyncHandler(async(req,res)=>{
   //     }
   //   }
   //  ])
+console.log(address.state?.trim());
 
 const distributor=await DistributorProfile.findOne({
-  "address.state":address?.trim.toLowerCase(),
-  verifiedByAdmin:true,
+  "businessAddress.state":address.state?.trim(),
+ status:"approved",
 })
+console.log("dist",distributor);
+
 if(!distributor){
   throw new ApiError(404,"No distributor found for your area!")
 }

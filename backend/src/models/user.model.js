@@ -67,6 +67,11 @@ const userSchema = new Schema({
         enum: ['active', 'suspended', 'pending'],
         default: 'active',
     },
+        distributorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null, // Only for retailer
+    },
     address: addressSchema,
     profilePic: {
         type: String,

@@ -47,7 +47,7 @@ const approvalSchema = new Schema({
 }, { _id: false });
 const addressSchema = new Schema({
     city: { type: String, trim: true, required: true },
-    state: { type: String, trim: true, required: true },
+    state: { type: String, trim: true, required: true, },
     pincode: { type: Number, required: true },
     country: { type: String, default: "India" }
 }, { _id: false });
@@ -75,6 +75,7 @@ const distributorProfileSchema = new Schema({
         type: String,
         trim: true,
         lowercase: true,
+         match: [/^\S+@\S+\.\S+$/, "Please enter a valid email"],
     },
     businessPhone: {
         type: String,
@@ -99,8 +100,7 @@ const distributorProfileSchema = new Schema({
         type: String,
         enum: ["pending", "approved", "rejected"],
         default: "pending"
-    },
+    }, 
 }, { timestamps: true });
-distributorProfileSchema.index({ userId: 1 });
  const  DistributorProfile=mongoose.models.DistributorProfile||mongoose.model("DistributorProfile",distributorProfileSchema);
  export {DistributorProfile}

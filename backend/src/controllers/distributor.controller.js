@@ -99,8 +99,8 @@ const updateDistributor = asyncHandler(async (req, res) => {
   }
   
   // Update distributor
-  const updatedDistributor = await DistributorProfile.findByIdAndUpdate(
-    isLoggedUser._id, 
+  const updatedDistributor = await DistributorProfile.findOneAndUpdate(
+    {userId:isLoggedUser._id}, 
     { $set: updateFields },
     { new: true, runValidators: true }
   );
@@ -417,9 +417,8 @@ const getOrdersByStatus=-asyncHandler(async(req,res)=>{
 //Retailer Management
 const getDistributorsRetailers = asyncHandler(async (req, res) => {
   const isLoggedUser = req.user;
-  const { page = 1, limit = 10, search } = req.body;
+  const { page=1, limit = 10, search='' } = req.body;
   const skip = (Number(page) - 1) * Number(limit);
-
   // 1. Authentication
   if (!isLoggedUser) {
     throw new ApiError(401, "Unauthorized user! Please login");
@@ -503,11 +502,7 @@ const getRetailerById = asyncHandler(async (req, res) => {
       name: 1,
       email: 1,
       phone: 1,
-      shopName: 1,
-      address: 1,
-      city: 1,
-      state: 1,
-      pincode: 1,
+      address:1,
       createdAt: 1,
     }
   );
@@ -581,27 +576,23 @@ const isLoggedUser=req.user;
 if(!isLoggedUser){
   throw new ApiError(401,"Unauthorized user!please login")
 }
-if(isLoggedUser.role.toLowercase()!=="distributor"){
+if(isLoggedUser.role.toLowerCase()!=="distributor"){
   throw new ApiError(403,"Access-denied only allowed distributor!")
 }
- const distributor = await User.findById(
-    isLoggedUser._id,
+ const distributor = await DistributorProfile.findOne(
+    {userId:isLoggedUser._id},
     {
-      name: 1,
-      email: 1,
-      phone: 1,
-      address: 1,
-      city: 1,
-      state: 1,
-      pincode: 1,
+      businessName: 1,
+      businessEmail: 1,
+      businessPhone: 1,
+      businessAddress: 1,
+      documents:1,
+      approval: 1,
       gstNumber: 1,
-      companyName: 1,
-      distributorCode: 1,
-      assignedArea: 1,
+      isActive: 1,
       status: 1,
-      createdAt: 1
     }
-  );
+  ).populate("userId","name").populate("approval.approvedBy","name");
     if (!distributor) {
     throw new ApiError(404, "Distributor profile not found!");
   }
@@ -617,178 +608,382 @@ const getNotification=asyncHandler(async(req,res)=>{
 
 //Inventory Management
 
+// const getInventoryReports=asyncHandler(async(req,res)=>{
+// const isLoggedUser=req.user;
+
+//   const {page=1,limit=10,search=""}=req.body;
+//   const pageNumber=Number(page)
+//   const skip=(pageNumber-1)*Number(limit)
+// if(!isLoggedUser){
+//   throw new ApiError(401,"Unauthorized user!please login")
+// }
+// if(isLoggedUser.role.toLowerCase()!=="distributor"){
+//   throw new ApiError(403,"Access-denied only allowed distributor!")
+// }
+// const filter={};
+// if(isLoggedUser.role.toLowerCase()==="distributor"){
+//   filter.distributorId=isLoggedUser._id
+// }
+// let productIds=[];
+// if(search){
+// const products=await Product.find({
+//   $or:[{name:{$regex:search,$options:"i"}},
+//   {brand:{$regex:search,$options:"i"}}],
+//    distributorId:isLoggedUser._id,
+// }).select("_id")
+
+
+
+// productIds=products.map(p=>p._id);
+// const categories=await Category.find({
+//   name:{$regex:search,$options:"i"}
+// }).select("_id")
+
+
+
+// const categoriesIds=categories.map(c=>c._id)
+// if(categories.length>0){
+//   const categoryProducts=await Product.find({
+//    category:{$in:categoriesIds}
+//   })
+//   const categoryProductsIds=categoryProducts.map(cp=>cp._id)
+
+//     productIds=[...new Set([...productIds,...categoryProductsIds])];
+//     if(productIds.length>0){
+//       filter.productId={$in:productIds}
+//     }else{
+//       filter.productId={$in:[]}
+//     }
+// }
+// }
+// const total=await Inventory.countDocuments(filter);
+
+// const lowStockProducts=await Inventory.aggregate([
+//   {
+//     $match:{
+//       distributorId:isLoggedUser._id,
+//       quantity:{$lte:10}
+//     }
+//   },
+//   {
+//     $group:{
+//       _id:"$productId",
+//       totalStock:{$sum:"$quantity"}
+//     }
+//   },
+//   {
+//     $match:{
+//       totalStock:{$lte:10}
+//     }
+//   },
+//   {
+//     $lookup:{
+//       from:"products",
+//       localField:"productId",
+//       foreignField:"_id",
+//       as:"product"
+//     }
+//   },
+//   {
+//     $unwind:"$product"
+//   },
+//   {
+//     $lookup:{
+//       from:"categories",
+//       localField:"product.category",
+//       foreignField:"_id",
+//       as:"category"
+//     }
+//   },
+//   {
+//     $unwind:"$category"
+//   },
+//   {
+//     $group:{
+//       _id:"$product.category",
+//       catName:{$first:"$category.name"},
+//       totalLowStockProducts:{$addToSet:"$productId"},
+//       lowStockProducts:{
+//         $push:{
+//           productId:"$productId",
+//          productName:"$product.name",
+//           stock:"$quantity",
+//           brand:"$product.brand",
+//         }
+//       }
+//     }
+//   },
+//   {
+//     $project:{
+//       _id: 0,
+//       categoryId: "$_id",
+//       catName: 1,
+//       totalLowStockProducts: { $size: "$totalLowStockProducts" },
+//       lowStockProducts: 1,
+//     }
+//   }
+// ])
+// const categorySummary=await Inventory.aggregate([
+//   {
+//     $match:{
+//       distributorId:isLoggedUser._id,
+//     }
+//   },
+//   {
+//     $lookup:{
+//       from:"products",
+//       localField:"productId",
+//       foreignField:"_id",
+//       as:"product"
+//     }
+//   },
+//   {
+//     $unwind:"$product"
+//   },
+//   {
+//     $lookup:{
+//       from:"categories",
+//       localField:"$product.category",
+//       foreignField:"_id",
+//       as:"category",
+//     }
+//   },
+//   {
+//     $unwind:"$category",
+//   },
+//   {
+//     $group:{
+//       _id:"$category._id",
+//       totalProducts:{$sum:1},
+//        categoryName: { $first: "$category.name" },
+//       products: { $addToSet: "$product._id" },
+//       totalStock: { $sum: "$quantity" }
+//     }
+//   },
+//    {
+//     $project: {
+//       _id: 0,
+//       categoryId: "$_id",
+//       categoryName: 1,
+//       totalProducts: { $size: "$products" },
+//       totalStock: 1
+//     }
+//   }
+// ])
+//  const inventoryList = await Inventory.find(filter)
+//     .populate("productId", "name price stock brand category")
+//     .sort({ createdAt: -1 })
+//     .skip(skip)
+//     .limit(limit);
+
+//   return res
+//     .status(200)
+//     .json(
+//       new ApiResponse(200, {
+//         total,
+//         lowStockProducts,
+//         categorySummary,
+//         inventoryList,
+//       })
+//     );
+// })
+
 const getInventoryReports=asyncHandler(async(req,res)=>{
-const isLoggedUser=req.user;
+   const isLoggedUser = req.user;
+  const { page = 1, limit = 10, search = "" } = req.body;
+  const pageNumber = Number(page);
+  const skip = (pageNumber - 1) * Number(limit);
 
-  const {page=1,limit=10,search=""}=req.body;
-  const skip=(Number(page)-1)*Number(limit)
-if(!isLoggedUser){
-  throw new ApiError(401,"Unauthorized user!please login")
-}
-if(isLoggedUser.role.toLowerCase()!=="distributor"){
-  throw new ApiError(403,"Access-denied only allowed distributor!")
-}
-const filter={};
-if(isLoggedUser.role.toLowerCase()==="distributor"){
-  filter.distributorId=isLoggedUser._id
-}
-let productIds=[];
-if(search){
-const products=await Product.find({
-  $or:[{name:{$regex:search,$options:"i"}},
-  {brand:{$regex:search,$options:"i"}}],
-   distributorId:isLoggedUser._id,
-}).select("_id")
-productIds=products.map(p=>p._id);
-const categories=await Category.find({
-  name:{$regex:search,$options:"i"}
-}).select("_id")
-const categoriesIds=categories.map(c=>c._id)
-if(categories.length>0){
-  const categoryProducts=await Product.find({
-   category:{$in:categoriesIds}
-  })
-  const categoryProductsIds=categoryProducts.map(cp=>cp._id)
+  // Authorization checks
+  if (!isLoggedUser) {
+    throw new ApiError(401, "Unauthorized user! Please login");
+  }
 
-    productIds=[...new Set([...productIds,...categoryProductsIds])];
-    if(productIds.length>0){
+  if (isLoggedUser.role.toLowerCase() !== "distributor") {
+    throw new ApiError(403, "Access denied - only allowed for distributors!");
+  }
+ const distributorId=isLoggedUser._id
+  // Base filter for distributor
+  const filter = { distributorId:distributorId };
+  if(search){
+    const productIds=await getProductIdsForSearch(search,distributorId);
+    if(productIds.length){
       filter.productId={$in:productIds}
     }else{
-      filter.productId={$in:[]}
+      res.status(200).json(new ApiResponse(200,{ total: 0,
+          lowStockProducts: [],
+          categorySummary: [],
+          inventoryList: [],}))
     }
-}
-}
-const total=await Inventory.countDocuments(filter);
+  }
+  const [total,lowStockProducts,categorySummary,inventoryList]=
+  await Promise.all([
+     Inventory.countDocuments(filter),
+     getLowStockProductsByCategory(distributorId),
+     getCategorySummary(distributorId),
+     Inventory.find(filter).populate("productId","name price stock brand category").
+     sort({createdAt:-1}).skip(skip).limit(limit)
+  ])
 
-const lowStockProducts=await Inventory.aggregate([
-  {
-    $match:{
-      distributorId:isLoggedUser._id,
-      quantity:{$lte:10}
-    }
-  },
-  {
-    $group:{
-      _id:"$productId",
-      totalStock:{$sum:"$quantity"}
-    }
-  },
-  {
-    $match:{
-      totalStock:{$lte:10}
-    }
-  },
-  {
-    $lookup:{
-      from:"products",
-      localField:"productId",
-      foreignField:"_id",
-      as:"product"
-    }
-  },
-  {
-    $unwind:"$product"
-  },
-  {
-    $lookup:{
-      from:"categories",
-      localField:"product.category",
-      foreignField:"_id",
-      as:"category"
-    }
-  },
-  {
-    $unwind:"$category"
-  },
-  {
-    $group:{
-      _id:"$product.category",
-      catName:{$first:"$category.name"},
-      totalLowStockProducts:{$addToSet:"$productId"},
-      lowStockProducts:{
-        $push:{
-          productId:"$productId",
-         productName:"$product.name",
-          stock:"$quantity",
-          brand:"$product.brand",
-        }
+
+   return res.status(200).json(
+    new ApiResponse(200, {
+      total,
+      page: pageNumber,
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+      lowStockProducts,
+      categorySummary,
+      inventoryList,
+    },"Inventory fetched successfully")
+  );
+
+
+  async function getProductIdsForSearch(search,distributorId){
+    const products=await Product.find({$or:[
+      {
+        name:{$regex:search,$options:"i"},
+      },
+      {
+        brand:{$regex:search,$options:"i"}
       }
-    }
-  },
-  {
-    $project:{
-      _id: 0,
-      categoryId: "$_id",
-      catName: 1,
-      totalLowStockProducts: { $size: "$totalLowStockProducts" },
-      lowStockProducts: 1,
-    }
+    ],
+    createdBy:distributorId
+  }).select("_id")
+    const productIds=products.map(p=>p._id)
+    const categories=await Category.find({name:{$regex:search,$options:"i"}}).select("_id");
+     const categoryIds=categories.map(c=>c._id);
+     if(categoryIds.length>0){
+      const categoryProducts=await Product.find({category:{$in:categoryIds},createdBy:distributorId}).select("_id")
+       const cpIds=categoryProducts.map((cp)=>cp._id);
+       productIds=[...new Set([...productIds,...cpIds])]
+     }
+     return productIds;
   }
-])
-const categorySummary=await Inventory.aggregate([
-  {
-    $match:{
-      distributorId:isLoggedUser._id,
-    }
-  },
-  {
-    $lookup:{
-      from:"products",
-      localField:"productId",
-      foreignField:"_id",
-      as:"product"
-    }
-  },
-  {
-    $unwind:"$product"
-  },
-  {
-    $lookup:{
-      from:"categories",
-      localField:"$product.category",
-      foreignField:"_id",
-      as:"category",
-    }
-  },
-  {
-    $unwind:"$category",
-  },
-  {
-    $group:{
-      _id:"$category._id",
-      totalProducts:{$sum:1},
-       categoryName: { $first: "$category.name" },
-      products: { $addToSet: "$product._id" },
-      totalStock: { $sum: "$quantity" }
-    }
-  },
-   {
-    $project: {
-      _id: 0,
-      categoryId: "$_id",
-      categoryName: 1,
-      totalProducts: { $size: "$products" },
-      totalStock: 1
-    }
+  async function getLowStockProductsByCategory(distributorId){
+    return await Inventory.aggregate([
+      {
+        $match:{
+          distributorId:distributorId,
+          quantity:{$lte:10}
+        }
+      },
+      {
+        $group:{
+          _id:"$productId",
+          totalStock:{$sum:"$quantity"}
+        }
+      },
+      {
+        $match:{
+          totalStock:{$lte:10}
+        }
+      },
+      {
+        $lookup:{
+          from:"products",
+          localField:"_id",
+          foreignField:"_id",
+          as:"product",
+        }
+      },
+      {
+        $unwind:"$product"
+      },
+      {
+        $lookup:{
+          from:"categories",
+          localField:"product.category",
+          foreignField:"_id",
+          as:"category"
+        }
+      },
+      {
+        $unwind:"$category"
+      },
+      {
+        $group:{
+          _id:"$product.category",
+          catName:{$first:"$category.name"},
+          totalLowStockProducts:{$addToSet:"$_id"},
+          lowStockProducts:{
+            $push:{
+              productId:"$_id",
+              productName:"$product.name",
+              totalStock:"$totalStock",
+              brand:"$product.brand",
+            }
+          }
+        }
+      },
+      {
+        $project:{
+          _id:0,
+          categoryId:"$_id",
+          catName:1,
+          totalLowStockProducts:{$size:"$totalLowStockProducts"},
+          lowStockProducts:1
+        }
+      },
+      {
+        $sort:{totalLowStockProducts:-1}
+      }
+    ])
   }
-])
- const inventoryList = await Inventory.find(filter)
-    .populate("productId", "name price stock brand category")
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
+  async function getCategorySummary(distributorId) {
+         await Inventory.aggregate([
+          {
+            $match:{
+              distributorId:distributorId
+            }
+          },
+          {
+            $lookup:{
+              from:"products",
+              localField:"productId",
+              foreignField:"_id",
+              as:"product"
+            }
+          },
+          {
+            $unwind:"$product"
+          },
+          {
+            $lookup:{
+              from:"categories",
+              localField:"product.category",
+              foreignField:"_id",
+              as:"category"
+            }
+          },
+          {
+            $unwind:"$category"
+          },
+          {
+            $group:{
+              _id:"$category._id",
+              categoryName:{$first:"$category.name"},
+              products:{$addToSet:"$product._id"},
+              totalStock:{$sum:"$quantity"}
+            }
+          },
+          {
+            $project:{
+              _id:0,
+              categoryId:"$_id",
+              categoryName:1,
+              totalProducts:{$size:"$products"},
+              totalStock:1,
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(200, {
-        total,
-        lowStockProducts,
-        categorySummary,
-        inventoryList,
-      })
-    );
+            }
+          },
+          {
+       $sort:{totalStock:-1},
+          }
+         ]) 
+  }
 })
+
 const updateWholesalePricing=asyncHandler(async(req,res)=>{
 const user=req.user;
 const {ids}=req.body
@@ -910,4 +1105,52 @@ const exportsProductsToExcel=asyncHandler(async(req,res)=>{
    await workBook.xlsx.write(res);
    res.status(200).end()
 })
-export {updateDistributor,approveRetailer,getDistributorProducts,getDistributorProductById,getDistributorOrders,getDistributorOrderById,OrderStatusChange,getDistributorsRetailers,getRetailerById,getDistributorProfile,getInventoryReports,updateWholesalePricing,exportsProductsToExcel}
+// retailer.controller.js
+const getAllApprovedDistributors = asyncHandler(async (req, res) => {
+    const { search = "" } = req.query; // search query from frontend
+
+    // Build filter
+    const filter = {
+        status: "approved",
+        $or: [
+            { businessName: { $regex: search, $options: "i" } },
+            { "businessAddress.city": { $regex: search, $options: "i" } },
+            { "businessAddress.state": { $regex: search, $options: "i" } }
+        ]
+    };
+
+    const distributors = await DistributorProfile.find(filter)
+        .select("businessName userId")
+        .populate("userId", "name email phone")
+        .sort({ createdAt: -1 });
+
+    return res.status(200).json(new ApiResponse(200, distributors, "Approved distributors fetched successfully"));
+});
+const uploadDistributorDocs = asyncHandler(async (req, res) => {
+  const user = req.user; // Must be logged-in distributor
+  if (user.role !== "distributor") throw new ApiError(403, "Only distributors allowed");
+
+  const distributorProfile = await DistributorProfile.findOne({ userId: user._id });
+  if (!distributorProfile) throw new ApiError(404, "Distributor profile not found");
+
+  // Example: upload files
+  if (req.files?.length) {
+    const uploadedDocs = [];
+    for (const file of req.files) {
+      const uploaded = await uploadFileOnCloud(file.path);
+      uploadedDocs.push({
+        docType: file.fieldname,
+        docUrl: uploaded?.url,
+        verified: false,
+      });
+      fs.unlinkSync(file.path);
+    }
+    distributorProfile.documents.push(...uploadedDocs);
+  }
+
+  await distributorProfile.save();
+  return res.status(200).json(new ApiResponse(200, distributorProfile, "Documents uploaded successfully"));
+});
+
+
+export {updateDistributor,approveRetailer,getAllApprovedDistributors,uploadDistributorDocs,getDistributorProducts,getDistributorProductById,getDistributorOrders,getDistributorOrderById,OrderStatusChange,getDistributorsRetailers,getRetailerById,getDistributorProfile,getInventoryReports,updateWholesalePricing,exportsProductsToExcel}

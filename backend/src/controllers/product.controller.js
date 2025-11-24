@@ -8,6 +8,7 @@ import csv from "csvtojson";
 import deleteFileOnCloud from "../utils/deleteFileOnCloud.js";
 import { ensureCategoryExists } from "../utils/category.helper.js";
 import mongoose from "mongoose";
+import { Inventory } from "../models/inventory.model.js";
 const createProduct = asyncHandler(async (req, res) => {
   const isLoggedUser = req?.user;
   if (isLoggedUser?.role?.trim()?.toLowerCase() === "retailer") {
@@ -107,6 +108,14 @@ const categoryDoc=await ensureCategoryExists(category);
     imagesPath.forEach((path) => fs.unlinkSync(path));
     throw new ApiError(500, "Product could not be created!");
   }
+  if(req.user.role.toLowerCase()==="distributor"){
+     await Inventory.create({
+  distributorId: req.user?._id,
+  productId: newProduct._id,
+  quantity: Number(stock)||0,
+});
+  }
+ 
   res
     .status(201)
     .json(new ApiResponse(201, newProduct, "Product added successfully"));
@@ -217,6 +226,7 @@ const updateProductdetails = asyncHandler(async (req, res) => {
 if(!updatedProduct){
    throw new ApiError(500,"product updated failed!")
 }
+
 return res.status(200).json(new ApiResponse(200,updatedProduct,"Product details updated successfully"))
 });
 const updateProdImages=asyncHandler(async(req,res)=>{
@@ -279,6 +289,8 @@ const removeProduct=asyncHandler(async(req,res)=>{
    throw new ApiError(400,"product id required!")
   }
   const deletedProduct=await Product.findByIdAndDelete(productId)
+  await Inventory.deleteMany({ productId: productId});
+
   if(!deletedProduct){
    throw new ApiError(500,"Product deletion failed!")
   }
@@ -425,6 +437,13 @@ if(!productId){
 if(!product){
   throw new ApiError(404,"Product not found!")
 }
+if(product.length){
+  await Inventory.findOneAndUpdate(
+  { productId: product._id },
+  { quantity: stock }
+);
+
+}
 return res.status(200).json(new ApiResponse(200,product,"Stock is updated successfully"))
 })
 const lowStock=asyncHandler(async(req,res)=>{
@@ -481,7 +500,7 @@ const bulkUploadProducts=asyncHandler(async(req,res)=>{
     const jsonArray=await csv().fromFile(csvPath);
     console.log("json",jsonArray);
     
-    if(!jsonArray&&!jsonArray?.length){
+    if(!jsonArray&&!jsonArray.length===0){
       fs.unlinkSync(csvPath)
       throw new ApiError(400,"file conversion failed!")
     }
@@ -546,20 +565,26 @@ if(newProducts.length===0){
       }
       })
     )
-    console.log("productWithImage",productsWithImages);
     
     const cleanProducts = productsWithImages.map((p, i) => ({
   ...p,
   price: Number(p.price) || 0,
   stock: Number(p.stock) || 0,
-  lowStockAlert: Number(p.lowStockAlert) || 0,
+  lowStockAlert: Number(p.lowStockAlert) || 10,
   discount: Number(p.discount) || 0,
   createdBy: user?._id,
   sku: `SKU${Date.now()}${i}`.toUpperCase(),
 }));
-console.log("clean",cleanProducts);
-
     const insertedProducts= await Product.insertMany(cleanProducts,{ordered:false});
+    if(insertedProducts.length){
+      const invent=insertedProducts.map((p)=>({
+        distributorId:user._id,
+        productId:p._id,
+        quantity:p.stock||0,
+      }))
+      await Inventory.insertMany(invent,{ordered:false})
+    }
+
     fs.unlinkSync(csvPath)
     if(!insertedProducts&&!insertedProducts.length){
       throw new ApiError(400,"Product uplaoded failed!")

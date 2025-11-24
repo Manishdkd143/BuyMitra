@@ -16,108 +16,93 @@ const generatedAccessAndRefreshToken=async(userId)=>{
      const accessToken=await user.generateAccessToken();
      user.refreshToken=refreshToken;
      await user.save({validateBeforeSave:false})
-     return {refreshToken,accessToken}
+     return {accessToken,refreshToken}
   } catch (error) {
     throw new ApiError(401,"Something went wrong while generating refresh and access tokens!")
   }
 }
+const userRegister = asyncHandler(async (req, res) => {
+  const { name, email, password, phone, gender, role, distributorId,city } = req.body;
 
-
-const userRegister=asyncHandler(async(req,res)=>{
-    //todo-->
-    /*
-    name email password take body
-    check validation 
-    hashed password 
-    take profile pic local path
-    check localPath and upload cloudinary
-    again check picpath
-    save db 
-
-    
-    */
-//    console.log(req.body);
-   
-   const {name,email,password,phone,role="retailer",gender}=req.body;
-  if([name,email,password,phone,gender,role].some((field)=>!field)){
-    fs.unlinkSync(req.file?.path)
-    throw new ApiError(401,"All fields required!")
+  // Validate
+  if ([name, email, password, phone, gender, role,city].some(field=>!field)) {
+    if (req.file?.path) fs.unlinkSync(req.file.path);
+    throw new ApiError(401, "All fields are required!");
   }
-  const exists=await User.findOne({email:email.toLowerCase()})
-  if(exists){
-     if(req.file?.path){
-        fs.unlinkSync(req.file?.path)
-      }
-    throw new ApiError(409,"User already registered!")
-  }
- if(role?.trim().toLowerCase()==="admin"){
- const existingAdmin= await User.findOne({role:"admin"});
-     if (existingAdmin) {
-      if(req.file?.path){
-        fs.unlinkSync(req.file?.path)
-      }
-        throw new ApiError(403, "Admin already exists! Only one admin is allowed.");
-    }
 
- }
-  let uploadedPic=null;
-   if(req.file?.path){
-    const picLocalPath=req.file?.path
-    uploadedPic=await uploadFileOnCloud(picLocalPath);
-    if(!uploadedPic){
-          throw new ApiError(500, "File upload failed! Please try again.");
-    }
-   }
-   
-    const newUser = await User.create({
-    name: name.trim().toLowerCase(),
+  // Check existing user
+  const exists = await User.findOne({ email: email.trim().toLowerCase() });
+  if (exists) {
+    if (req.file?.path) fs.unlinkSync(req.file.path);
+    throw new ApiError(409, "User already registered!");
+  }
+
+  // Upload profile picture
+  let uploadedPic = null;
+  if (req.file?.path) {
+    uploadedPic = await uploadFileOnCloud(req.file.path);
+    if (!uploadedPic) throw new ApiError(500, "File upload failed!");
+  }
+
+  // Create User
+  const newUser = await User.create({
+    name: name.trim(),
     email: email.trim().toLowerCase(),
     password,
     phone: phone.trim(),
-    role: role ? role.trim().toLowerCase() : "retailer",
-    profilePic: uploadedPic?.url||null,
-    gender: gender.trim().toLowerCase(),
+    gender: gender.toLowerCase(),
+    profilePic: uploadedPic?.url || null,
+    role,
+    address:{city:city.trim().toLowerCase()},
+    distributorId: role === "retailer" ? distributorId : null,
+    isVerified: role === "distributor" ? false : true, // Distributors must be verified
   });
-    if(!newUser){
-        throw new ApiError(402,"User not created!")
-    }
-    const createdUser=await User.findById(newUser._id).select("-password -refreshToken")
-    if(!createdUser){
-        throw new ApiError(404,"User registration failed!")
-    }
-    return res.status(201).json(new ApiResponse(201,createdUser,"User created successfully"))
-})
-const userLogin=asyncHandler(async(req,res)=>{
-    const {email,password}=req.body;
-    if(!email){
-        throw new ApiError(401,"Email is required!")
-    }
-     if(!password){
-        throw new ApiError(401,"Password is required!")
-    }
-    const user=await User.findOne({email:email?.trim().toLowerCase()});
-    if(!user){
-        throw new ApiError(404,"User not exists!please register")
-    }
-    const isPasswordValid=await user.isPasswordCorrect(password);
-    if(!isPasswordValid){
-        throw new ApiError(402,"Invalid user credentials!")
-    }
-    const {refreshToken,accessToken}=await generatedAccessAndRefreshToken(user._id);
-     if(!refreshToken||!accessToken){
-    throw new ApiError(401,"Tokens is empty!");
-   }
-   const isLoggedUser=await User.findById(user._id).select("-password -refreshToken")
 
-   const options={
-    httpOnly:true,
-    secure:true,
-   }
-   return res.status(200)
-   .cookie('refreshToken',refreshToken,options)
-   .cookie('accessToken',accessToken,options)
-   .json(new ApiResponse(200,{user:isLoggedUser,accessToken,distributorId:isLoggedUser.role.toLowerCase()==="distributor"?isLoggedUser._id:null},"User Logged successfully!"))
-})
+  // If distributor, create empty DistributorProfile
+  if (role === "distributor") {
+    await DistributorProfile.create({
+      userId: newUser._id,
+      businessName: "",
+      gstNumber: "",
+      businessAddress: {},
+      documents: [],
+      status: "pending",
+    });
+  }
+
+  const createdUser = await User.findById(newUser._id).select("-password -refreshToken");
+  return res.status(201).json(new ApiResponse(201, createdUser, "User registered successfully!"));
+});
+
+const userLogin = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) throw new ApiError(401, "Email and password required!");
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) throw new ApiError(404, "User not found!");
+
+    // Admin cannot use this route
+    if (user.role === "admin") throw new ApiError(403, "Admins must use admin login route!");
+
+    const isValidPassword = await user.isPasswordCorrect(password);
+    if (!isValidPassword) throw new ApiError(402, "Invalid credentials!");
+
+    const { accessToken, refreshToken } = await generatedAccessAndRefreshToken(user._id);
+
+    const loggedUser = await User.findById(user._id).select("-password -refreshToken");
+
+    // If retailer, return distributorId
+    const extraData = user.role === "retailer" ? { distributorId: user.distributorId } : {};
+
+    const options = { httpOnly: true, secure: true };
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(new ApiResponse(200, { user: loggedUser, accessToken, ...extraData }, "Logged in successfully"));
+});
+
 const userLogout=asyncHandler(async(req,res)=>{
     const user=req.user;
     if(!user){
@@ -412,5 +397,4 @@ const applyForDistributor=asyncHandler(async(req,res)=>{
     );
 })
 
-
-export {userRegister,userLogin,userLogout,getCurrentUser,updatePassword,updateProfilePic,updateUserdetails,refreshAccessToken,removeAccount,deleteProfilePic,forgotPassword,resetPassword,applyForDistributor}
+export {userRegister,userLogin,userLogout,getCurrentUser,updatePassword,updateProfilePic,updateUserdetails,refreshAccessToken,removeAccount,deleteProfilePic,forgotPassword,resetPassword,applyForDistributor,generatedAccessAndRefreshToken}

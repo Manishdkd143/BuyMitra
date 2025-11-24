@@ -1,26 +1,41 @@
 import { Router } from "express";
 import { isAdmin } from "../middleware/role.middleware.js";
 import verifyJWT from "../middleware/auth.middleware.js";
-import { approvalUser, approveDistributor, changeUserRole, deleteAnyAccount, getAllApprovedDistributor, getAllApprovedUser, getAllRejectedDistributor, getAllUser, getPendingApplication, getUnApprovedUser, getUserById, rejectDistributor } from "../controllers/admin.controller.js";
+import { 
+  adminRegister,
+  adminLogin,
+  getAllUser,
+  getUserById,
+  changeUserRole,
+  deleteAnyAccount,
+  getAllApprovedUsers,
+  getUnapprovedUsers,
+  getPendingApplication,
+  approveDistributor,
+  rejectDistributor,
+  getAllApprovedDistributor,
+  getAllRejectedDistributor
+} from "../controllers/admin.controller.js";
 const router=Router();
 
-router.route("/users/pending-applications").get(verifyJWT,isAdmin,getPendingApplication);
-router.route("/users/approve/:applicationId").post(verifyJWT,isAdmin,approveDistributor);
-router.route("/users/reject/:applicationId").post(verifyJWT,isAdmin,rejectDistributor)
-router.route("/users/rejected-distributor").get(verifyJWT,isAdmin,getAllRejectedDistributor)
+/* ----------------  PROTECTED ADMIN ROUTES ---------------- */
+router.use(verifyJWT, isAdmin);
+/* USER MANAGEMENT */
+router.route("/users").get(getAllUser);
+router.route("/users/approved").get(getAllApprovedUsers);
+router.route("/users/unapproved").get(getUnapprovedUsers);
+router.route("/users/:userId").get(getUserById);
+router.route("/users/:userId/role").patch(changeUserRole);
+router.route("/users/:userId").delete(deleteAnyAccount);
+/* DISTRIBUTOR APPLICATION FLOW */
+router.route("/distributor/pending").get(getPendingApplication);
 
-router.route("/users/approved-distributor").get(verifyJWT, isAdmin, getAllApprovedDistributor);
+router.route("/distributor/approve/:applicationId").patch(approveDistributor);
+router.route("/distributor/reject/:applicationId").patch(rejectDistributor);
 
+router.route("/distributor/approved").get(getAllApprovedDistributor);
+router.route("/distributor/rejected").get(getAllRejectedDistributor);
 
-
-
-router.route("/users/approvedusers").get(verifyJWT, isAdmin, getAllApprovedUser);
-// router.route("/users/unapprovedusers").get(verifyJWT, isAdmin, getUnApprovedUser);
-// router.route("/users/role/:userId").patch(verifyJWT, isAdmin, changeUserRole);
-// router.route("/users/approval/:userId").patch(verifyJWT, isAdmin, approvalUser);
-// router.route("/users/:userId").get(verifyJWT, isAdmin, getUserById);
-// router.route("/users/:userId").post(verifyJWT, isAdmin, deleteAnyAccount);
-router.route("/users").get(verifyJWT, isAdmin, getAllUser);
 
 
 

@@ -5,6 +5,7 @@ import { isAdminOrDistributor } from "../middleware/role.middleware.js";
 import {
   approveRetailer,
   exportsProductsToExcel,
+  getAllApprovedDistributors,
   getDistributorOrderById,
   getDistributorOrders,
   getDistributorProductById,
@@ -17,6 +18,7 @@ import {
   updateDistributor,
   updateWholesalePricing
 } from "../controllers/distributor.controller.js";
+import { getAllApprovedDistributor } from "../controllers/admin.controller.js";
 
 const router = Router();
 
@@ -42,11 +44,11 @@ router
   .get(isAdminOrDistributor, getDistributorsRetailers);
 
 router
-  .route("/retailers/:id")
+  .route("/retailer/:retailerId")
   .get(isAdminOrDistributor, getRetailerById);
 
 router
-  .route("/retailers/approve/:id")
+  .route("/retailers/approve/:retailerId")
   .put(isAdminOrDistributor, approveRetailer);
 
 /* -----------------------------
@@ -57,11 +59,11 @@ router
   .get(isAdminOrDistributor, getDistributorProducts);
 
 router
-  .route("/products/:id")
+  .route("/products/:productId")
   .get(isAdminOrDistributor, getDistributorProductById);
 
 router
-  .route("/products/wholesale-pricing")
+  .route("/products/wholePrice")
   .put(isAdminOrDistributor, updateWholesalePricing);
 
 /* -----------------------------
@@ -92,5 +94,7 @@ router
 router
   .route("/products/export/excel")
   .get(isAdminOrDistributor, exportsProductsToExcel);
+
+  router.route("/approved").get(getAllApprovedDistributors)
 
 export default router;

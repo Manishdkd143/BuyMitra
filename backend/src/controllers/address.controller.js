@@ -39,10 +39,10 @@ const addAddress=asyncHandler(async(req,res)=>{
         anotherPhone: anotherPhone?.trim(),
         addressLine1: addressLine1.trim(),
         addressLine2: addressLine2?.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        pincode: pincode.trim(),
-        country: country.trim(),
+          city: city.trim().toLowerCase().replace(/\s+/g, ""),
+    state: state.trim().toLowerCase().replace(/\s+/g, ""),
+    pincode: pincode.trim(),
+    country: country.trim().toLowerCase().replace(/\s+/g, ""),
         addressType,
         isDefault: shouldBeDefault
     })

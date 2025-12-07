@@ -9,6 +9,7 @@ import deleteFileOnCloud from "../utils/deleteFileOnCloud.js";
 import { ensureCategoryExists } from "../utils/category.helper.js";
 import mongoose from "mongoose";
 import { Inventory } from "../models/inventory.model.js";
+import { log } from "console";
 const createProduct = asyncHandler(async (req, res) => {
   const isLoggedUser = req?.user;
   if (isLoggedUser?.role?.trim()?.toLowerCase() === "retailer") {
@@ -702,6 +703,7 @@ const bulkVerify=asyncHandler(async(req,res)=>{
  const validIds=[];
  const inValidIds=[];
  ids.forEach((id)=>{
+
   if(mongoose.isValidObjectId(id)){
     validIds.push(id)
   }else {
@@ -712,15 +714,12 @@ const bulkVerify=asyncHandler(async(req,res)=>{
   throw new ApiError(400,"No valid product IDs provided!")
  }
   const updatePromises= validIds.map((id)=>
-        Product.findByIdAndUpdate(id,{
-     isVerified:true,
-    },
-  {
-    new:true,
-    runValidators:true,
-  })
+        Product.findByIdAndUpdate(id,{isVerified:true},{
+          new:true,
+          runValidators:true,
+        })
   )
-  const result=await Promise.allSettled(updatePromises)
+  const result=await Promise.allSettled(updatePromises);
   const successUpdate=[];
   const failedUpdate=[];
   

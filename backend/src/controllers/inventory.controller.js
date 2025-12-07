@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
-import { Inventory } from "../models/inventory.model";
-import { ApiError } from "../utils/ApiError";
-import asyncHandler from "../utils/asyncHandler";
-import { ApiResponse } from "../utils/ApiResponse";
-import { Product } from "../models/product.model";
+import { Inventory } from "../models/inventory.model.js";
+import { ApiError } from "../utils/ApiError.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { Product } from "../models/product.model.js";
 
-const addorUpdateInventory=asyncHandler(async(req,res)=>{
+const addInventory=asyncHandler(async(req,res)=>{
     const isLoggedUser=req.user;
     if(!isLoggedUser){
         throw new ApiError(401,"Unauthorized user!please login")
@@ -170,4 +170,4 @@ const getInventoryById = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, inventory, "Inventory details fetched"));
 });
 
-export {addorUpdateInventory,updateInventory,deleteInventory,getInventory,getInventoryById}
+export {addInventory,updateInventory,deleteInventory,getInventory,getInventoryById}

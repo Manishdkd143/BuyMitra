@@ -66,32 +66,38 @@ const updateDistributor = asyncHandler(async (req, res) => {
   }
   
   // City
-  if (city !== undefined) {
-    if (!city?.trim()) {
-      throw new ApiError(400, "City cannot be empty!");
-    }
-    updateFields.city = city.trim().replace(/\s+/g, '');
+if (city !== undefined) {
+  if (!city?.trim()) {
+    throw new ApiError(400, "City cannot be empty!");
   }
+
+  updateFields.businessAddress = updateFields.businessAddress || {};
+  updateFields.businessAddress.city = city.trim().toLowerCase().replace(/\s+/g, "");
+}
   
   // State
-  if (state !== undefined) {
-    if (!state?.trim()) {
-      throw new ApiError(400, "State cannot be empty!");
-    }
-    updateFields.state = state.trim().replace(/\s+/g, '');
+if (state !== undefined) {
+  if (!state?.trim()) {
+    throw new ApiError(400, "State cannot be empty!");
   }
+
+  updateFields.businessAddress = updateFields.businessAddress || {};
+  updateFields.businessAddress.state = state.trim().toLowerCase().replace(/\s+/g, "");
+}
   
   // Pincode
-  if (pincode !== undefined) {
-    const pincodeStr = pincode.toString().trim();
-    if (!pincodeStr) {
-      throw new ApiError(400, "Pincode cannot be empty!");
-    }
-    if (!/^\d{6}$/.test(pincodeStr)) {
-      throw new ApiError(400, "Pincode must be 6 digits!");
-    }
-    updateFields.pincode = pincodeStr;
+if (pincode !== undefined) {
+  const pincodeStr = pincode.toString().trim();
+  if (!pincodeStr) {
+    throw new ApiError(400, "Pincode cannot be empty!");
   }
+  if (!/^\d{6}$/.test(pincodeStr)) {
+    throw new ApiError(400, "Pincode must be 6 digits!");
+  }
+
+  updateFields.businessAddress = updateFields.businessAddress || {};
+  updateFields.businessAddress.pincode = pincodeStr;
+}
   
   // Check if at least one field is provided
   if (Object.keys(updateFields).length === 0) {
@@ -102,7 +108,7 @@ const updateDistributor = asyncHandler(async (req, res) => {
   const updatedDistributor = await DistributorProfile.findOneAndUpdate(
     {userId:isLoggedUser._id}, 
     { $set: updateFields },
-    { new: true, runValidators: true }
+    { new: true }
   );
   
   if (!updatedDistributor) {

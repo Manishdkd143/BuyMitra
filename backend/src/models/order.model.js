@@ -94,6 +94,32 @@ const orderSchema = new Schema({
   
 }, { timestamps: true });
 orderSchema.pre('save',function(next){
-
+   if(!this.orderNumber){
+     const randomPort=Math.floor(1000+Math.random()*9000);
+     this.orderNumber=`ORD-${Date.now()}+${randomPort}`
+   }
+   let total;
+   this.products=this.products.map((item)=>{
+    const price=Number(item.price)||0;
+    const qty=Number(item.quantity)||0;
+    const itemTotal=price*qty;
+    item.totalPrice=itemTotal;
+    total+=itemTotal
+    return item;
+   })
+  this.totalAmount=total;
+  if(this.status==="confirmed"&&!this.confirmedAt){
+    this.confirmedAt=new Date()
+  }
+  if(this.status==="shipped"&&!this.shippedAt){
+    this.shippedAt=new Date()
+  }
+  if(this.status==="delivered"&&!this.deliveredAt){
+    this.deliveredAt=new Date()
+  }
+  if(this.status==="cancelled"&&!this.cancelledAt){
+    this.cancelledAt=new Date()
+  }
+  next()
 })
 export const Order = mongoose.models.Order|| mongoose.model("Order", orderSchema);

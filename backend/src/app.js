@@ -21,6 +21,10 @@ import cartRouter from "./routes/cart.routes.js"
 import addressRouter from "./routes/address.routes.js"
 import distributorRouter from "./routes/distributor.routes.js"
 import authRouter from "./routes/auth.routes.js"
+import invertory from "./routes/inventory.routes.js"
+import paymentRouter from "./routes/payment.routes.js";
+import webhookRouter from "./routes/webhook.routes.js"
+
 
 
 app.use('/api/v1/auth',authRouter);
@@ -31,6 +35,11 @@ app.use('/api/v1/categories',categoryRouter);
 app.use('/api/v1/carts',cartRouter);
 app.use('/api/v1/address',addressRouter);
 app.use('/api/v1/distributors',distributorRouter);
+app.use("/api/v1/inventory",invertory)
+app.use("/api/v1/payment",paymentRouter)
+app.use("/api/v1/webhook",webhookRouter)
+
+
 
 
 export {app}

@@ -1,4 +1,4 @@
-import express from "express";
+import Router from "express";
 import {
   addInventory,
   updateInventory,
@@ -7,12 +7,13 @@ import {
   getInventoryById
 } from "../controllers/inventory.controller.js";
 
-import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { isAdminOrDistributor } from "../middleware/role.middleware.js";
+import verifyJWT from "../middleware/auth.middleware.js";
 
-const router = express.Router();
+const router =Router();
 
 // APPLY JWT AUTH ON ALL ROUTES
-router.use(verifyJWT);
+router.use(verifyJWT,isAdminOrDistributor);
 
 // GET ALL + SEARCH + PAGINATION
 router.route("/")

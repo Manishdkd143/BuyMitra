@@ -34,7 +34,7 @@ router
 
 router
   .route("/update")
-  .put(isAdminOrDistributor, updateDistributor);
+  .patch(isAdminOrDistributor, updateDistributor);
 
 /* -----------------------------
    RETAILERS

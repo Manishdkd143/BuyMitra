@@ -1,95 +1,106 @@
-import mongoose,{Schema} from "mongoose";
+import mongoose, { Schema } from "mongoose";
+
 const CartItemSchema = new Schema({
   productId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product',
-    required: true
+    type: Schema.Types.ObjectId,
+    ref: "Product",
+    required: true,
   },
   sku: {
     type: String,
-    required: true
+    required: true,
   },
   qty: {
     type: Number,
     required: true,
-    min: 1
+    min: 1,
   },
   price: {
     type: Number,
-    required: true
+    required: true,
   },
   discount: {
     type: Number,
-    default: 0 // percentage or flat, depending on logic
+    default: 0, // % discount or flat (depends on logic)
   },
   subTotal: {
     type: Number,
-    default:0,
-  }
+    default: 0,
+  },
 }, { _id: false });
 
-const cartSchema = new mongoose.Schema({
+const cartSchema = new Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: Schema.Types.ObjectId,
+    ref: "User",
     required: true,
+    index: true,
   },
+
   items: {
     type: [CartItemSchema],
-    default: []
+    default: [],
   },
   itemsTotal: {
     type: Number,
-    default: 0 // sum of all item totals
+    default: 0,      // sum of all item subTotals
   },
   coupon: {
-    code: String,
-    discountAmount: Number
+    code: { type: String, default: null },
+    discountAmount: { type: Number, default: 0 },
   },
-  Tax:{
-    type:Number,
-   default:0,
+  tax: {
+    type: Number,
+    default: 0,
   },
-  discount:{
-    type:Number,
-    default:0,
+  shippingCharge: {
+    type: Number,
+    default: 0,
   },
   grandTotal: {
-    type: Number
-  },
-  shippingCharge:{
-    type:Number,
-    default:0,
+    type: Number,
+    default: 0,
   },
   lastUpdated: {
     type: Date,
-    default: Date.now(),
-  }
+    default: Date.now,
+  },
+
 }, { timestamps: true });
-cartSchema.pre('save',function(next){
-    let subtotal=0;
-    if(!this.items||this.items.length===0){
-      this.subtotal=0;
-      this.grandTotal=0;
-      this.lastUpdated=new Date()
-      return next()
-    }
-        this.items = this.items.map(item => {
+
+
+// =================== PRE-SAVE CALCULATION ======================
+cartSchema.pre("save", function (next) {
+  let subtotal = 0;
+
+  if (!this.items || this.items.length === 0) {
+    this.itemsTotal = 0;
+    this.grandTotal = 0;
+    this.shippingCharge = 0;
+    this.tax = 0;
+    this.lastUpdated = new Date();
+    return next();
+  }
+
+  this.items = this.items.map((item) => {
     const qty = Number(item.qty || 0);
     const price = Number(item.price || 0);
     const itemTotal = qty * price;
-
     item.subTotal = itemTotal;
     subtotal += itemTotal;
     return item;
   });
-  this.itemsTotal=subtotal;
-  if(this.coupon&&this.coupon.discountAmount){
-    this.grandTotal=Math.max(0,subtotal-this.coupon.discountAmount)
-  }else{
-    this.grandTotal=subtotal
-  }
-    this.lastUpdated=new Date();
-    next();
-})
-export const Cart=mongoose.models.Cart||mongoose.model("Cart",cartSchema);
+
+  this.itemsTotal = subtotal;
+
+  // APPLY COUPON
+  let afterCoupon = subtotal - (this?.coupon?.discountAmount || 0);
+
+  // ADD TAX, SHIPPING
+  this.grandTotal = Math.max(0, afterCoupon + this.tax + this.shippingCharge);
+
+  this.lastUpdated = new Date();
+  next();
+});
+
+export const Cart = mongoose.models.Cart || mongoose.model("Cart", cartSchema);

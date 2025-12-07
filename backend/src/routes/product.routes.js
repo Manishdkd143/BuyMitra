@@ -17,10 +17,10 @@ router.route("/unverified").get(verifyJWT,isAdminOrDistributor,unVerifiedProduct
 router.route("/c/product").get(verifyJWT,isAdminOrDistributor,getProductByIdOrSlug)
 router.route("/stock/:productId").patch(verifyJWT,isAdminOrDistributor,stockUpdate)
 router.route("/lowStock").get(verifyJWT,isAdminOrDistributor,lowStock)
-router.route("/alldelete").post(verifyJWT,isAdminOrDistributor,deleteAllProducts)
-router.route("/bulkdelete").post(verifyJWT,isAdminOrDistributor,bulkdelete)
+router.route("/alldelete").delete(verifyJWT,isAdminOrDistributor,deleteAllProducts)
+router.route("/bulkdelete").delete(verifyJWT,isAdminOrDistributor,bulkdelete)
 router.route("/uploadfile").post(verifyJWT,isAdminOrDistributor,Upload.single("csvfile"),bulkUploadProducts)
-router.route("/bulkVerify").post(verifyJWT,isAdminOrDistributor,bulkVerify)
+router.route("/bulkVerify").patch(verifyJWT,isAdminOrDistributor,bulkVerify)
 //Admin
 router.route("/all").get(verifyJWT,isAdminOrDistributor,allProductsByAdminAndDist)
 router.route("/stats").get(verifyJWT,isAdminOrDistributor,stats)

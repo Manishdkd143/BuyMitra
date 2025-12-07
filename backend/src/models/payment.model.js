@@ -15,17 +15,16 @@ const paymentSchema=new Schema({
     },
     status:{
         type:String,
-        enum:["Pending","Success","Failed","Refunded"],
+        enum:["pending","success","failed","refunded"],
         required:true,
     },
-    method:{
+    paymentMode:{
         type:String,
         required:true,
     },
-    currency:{
-        type:String,
-        default:"INR"
-    },
+    signature:String,
+
+
 
 },{timestamps:true})
-export const Payment=mongoose.model("Payment",paymentSchema)
+export const Payment=mongoose.models.Payment||mongoose.model("Payment",paymentSchema);

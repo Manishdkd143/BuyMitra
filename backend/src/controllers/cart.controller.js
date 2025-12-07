@@ -14,7 +14,9 @@ const addToCart = asyncHandler(async (req, res) => {
   if (!isLoggedUser) {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
-
+if(["admin","distributor"].includes(isLoggedUser.role.toLowerCase())){
+  throw new ApiError(401,"Only retailer buying product!")
+}
   if (!productId || !isValidObjectId(productId)) {
     throw new ApiError(400, "Invalid or missing product ID");
   }
@@ -440,30 +442,28 @@ const calculateShipping=asyncHandler(async(req,res)=>{
   //     }
   //   }
   //  ])
-console.log(address.state?.trim());
+console.log(address.state?.trim().toLowerCase());
 
 const distributor=await DistributorProfile.findOne({
-  "businessAddress.state":address.state?.trim(),
+  "businessAddress.state":address.state?.trim()?.toLowerCase(),
  status:"approved",
 })
-console.log("dist",distributor);
-
 if(!distributor){
   throw new ApiError(404,"No distributor found for your area!")
 }
 let shippingCharge=0;
 const userPin=address.pincode;
-const distPin=distributor?.address.pincode;
+const distPin=distributor?.businessAddress.pincode;
 const pinDiff=Math.abs(userPin-distPin)
-   if(pinDiff){
-    shippingCharge=30;
-     }else if(pinDiff<=80){
-      shippingCharge=40
-     }else if(pinDiff<=100){
-      shippingCharge=50
-     }else{
-      shippingCharge=100;
-     }
+console.log(pinDiff);
+if (!pinDiff && pinDiff !== 0) {
+  throw new Error("pinDiff required");
+}
+
+if (pinDiff <= 50) shippingCharge = 30;
+else if (pinDiff <= 80) shippingCharge = 40;
+else if (pinDiff <= 100) shippingCharge = 50;
+else shippingCharge = 100;
      cart.shippingCharge=shippingCharge;
      await cart.save()
      return res.status(200).json(
@@ -474,4 +474,62 @@ const pinDiff=Math.abs(userPin-distPin)
     }, "Shipping calculated")
   );
 })
-export {addToCart,removeToCart,updateCartItemQuantity,getUserCart,deleteCart,clearCart,getCartSummary,calculateShipping,bulkRemoveItems,mergeGuestCartWithUserCart}
+const calculateTotal = asyncHandler(async (req, res) => {
+  const isLoggedUser = req.user;
+  const { cartId } = req.body;
+
+  if (!isLoggedUser) {
+    throw new ApiError(401, "Unauthorized user! Please login");
+  }
+
+  if (!cartId || !mongoose.isValidObjectId(cartId)) {
+    throw new ApiError(400, "Cart ID is required and must be valid");
+  }
+
+  const cart = await Cart.findOne({ _id: cartId, userId: isLoggedUser._id });
+
+  if (!cart) {
+    throw new ApiError(404, "Cart not found!");
+  }
+
+  // ---- Recalculate item totals ----
+  let subtotal = 0;
+  cart.items.forEach((item) => {
+    const qty = Number(item.qty || 0);
+    const price = Number(item.price || 0);
+    const itemTotal = qty * price;
+
+    item.subTotal = itemTotal;
+    subtotal += itemTotal;
+  });
+
+  // ---- Assign itemsTotal ----
+  cart.itemsTotal = subtotal;
+
+  // ---- Apply coupon discount ----
+  const discountAmount = cart?.coupon?.discountAmount || 0;
+  cart.discount = discountAmount;
+
+  let afterDiscount = subtotal - discountAmount;
+
+  // ---- Apply tax ----
+  const taxRate = 0.12; // change if required
+  cart.Tax = Math.round(afterDiscount * taxRate);
+
+  let afterTax = afterDiscount + cart.Tax;
+
+  // ---- Add shipping charge ----
+  cart.shippingCharge = cart.shippingCharge || 0;
+
+  // ---- Calculate grand total ----
+  cart.grandTotal = Math.max(0, afterTax + cart.shippingCharge);
+
+  cart.lastUpdated = new Date();
+  await cart.save();
+
+  return res.status(200).json(
+    new ApiResponse(200, cart, "Cart totals calculated successfully!")
+  );
+});
+
+export {addToCart,removeToCart,updateCartItemQuantity,getUserCart,deleteCart,clearCart,getCartSummary,calculateShipping,bulkRemoveItems,mergeGuestCartWithUserCart,calculateTotal}

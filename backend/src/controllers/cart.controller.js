@@ -9,7 +9,7 @@ import { DistributorProfile } from "../models/distributorProfile.model.js";
 
 const addToCart = asyncHandler(async (req, res) => {
   const isLoggedUser = req.user;
-  const { productId, quantity, price,sku } = req.body;
+  const { productId, quantity, price,sku,distributorId } = req.body;
 
   if (!isLoggedUser) {
     throw new ApiError(401, "Unauthorized user! Please login");
@@ -31,6 +31,10 @@ if(["admin","distributor"].includes(isLoggedUser.role.toLowerCase())){
    if(!sku){
     throw new ApiError(400,"Sku is required!")
    }
+   if (!distributorId || !isValidObjectId(distributorId)) {
+    throw new ApiError(400, "DistributorId is required!")
+  }
+
   let cart = await Cart.findOne({ userId: isLoggedUser._id });
 
   if (cart) {
@@ -43,6 +47,7 @@ if(["admin","distributor"].includes(isLoggedUser.role.toLowerCase())){
     } else {
       cart.items.push({ productId, qty: quantity, price,sku:sku?.trim()?.toUpperCase() });
     }
+      cart.distributorId = distributorId;
     await cart.save(); 
     return res.status(200).json(new ApiResponse(200, cart, "Cart updated successfully"));
   }
@@ -50,6 +55,7 @@ if(["admin","distributor"].includes(isLoggedUser.role.toLowerCase())){
   // Create new cart
   const newCart = await Cart.create({
     userId: isLoggedUser._id,
+    distributorId,
     items: [{ productId, qty: quantity, price,sku:sku?.trim()?.toUpperCase()}]
   });
 

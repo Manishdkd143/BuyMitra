@@ -36,6 +36,11 @@ const cartSchema = new Schema({
     required: true,
     index: true,
   },
+  distributorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+},
 
   items: {
     type: [CartItemSchema],

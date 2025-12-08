@@ -45,8 +45,8 @@ const createPaymentOrder = asyncHandler(async (req, res) => {
   }
 
   // Validate shipping address fields
-  const { name, phone, address, city, state, pincode } = shippingAddress;
-  if (!name || !phone || !address || !city || !state || !pincode) {
+  const { name, phone, city, state, pincode } = shippingAddress;
+  if (!name || !phone  || !city || !state || !pincode) {
     throw new ApiError(400, "Complete shipping address is required (name, phone, address, city, state, pincode)");
   }
 
@@ -68,11 +68,11 @@ const createPaymentOrder = asyncHandler(async (req, res) => {
 
   for (const item of products) {
     // Validate product fields
-    if (!item.productId) {
+    if (!item.productId?._id) {
       throw new ApiError(400, "Product ID is required for each product");
     }
 
-    if (!item.name) {
+    if (!item.productId?.name) {
       throw new ApiError(400, "Product name is required");
     }
 
@@ -94,7 +94,7 @@ const createPaymentOrder = asyncHandler(async (req, res) => {
       throw new ApiError(404, `Product not found: ${item.name}`);
     }
 
-    if (!product.isActive) {
+    if (!product.status) {
       throw new ApiError(400, `Product is not available: ${product.name}`);
     }
 
@@ -144,7 +144,6 @@ const createPaymentOrder = asyncHandler(async (req, res) => {
       shippingAddress: {
         name: name.trim(),
         phone: phone.trim(),
-        address: address.trim(),
         city: city.trim(),
         state: state.trim(),
         pincode: pincode.trim(),
@@ -177,10 +176,6 @@ const createPaymentOrder = asyncHandler(async (req, res) => {
         customer_name: name.trim(),
         customer_email: customerEmail.trim(),
         customer_phone: phone.trim(),
-      },
-      order_meta: {
-        return_url: `${process.env.FRONTEND_URL}/payment/verify?order_id=${order.orderNumber}`,
-        notify_url: `${process.env.BACKEND_URL}/api/v1/payments/webhook`,
       },
       order_note: orderNotes?.trim() || `Payment for order ${order.orderNumber}`,
     };
@@ -232,11 +227,12 @@ const createPaymentOrder = asyncHandler(async (req, res) => {
         201,
         {
           order: {
-            _id: order._id,
+            orderId: order._id,
             orderNumber: order.orderNumber,
-            totalAmount: order.totalAmount,
+            orderAmount: order.totalAmount,
             paymentStatus: order.paymentStatus,
             orderStatus: order.orderStatus,
+            paymentMode:order.paymentMethod,
           },
           cashfree: {
             payment_session_id: response.data.payment_session_id,
@@ -264,89 +260,42 @@ const createPaymentOrder = asyncHandler(async (req, res) => {
     );
   }
 });
-const verifyPayment = asyncHandler(async (req, res) => {
-  const { orderNumber, paymentId, amount, status, paymentMode, signature } = req.body;
+ const verifyPayment = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
 
-  // Validate required fields
-  if (!orderNumber || !paymentId || !amount || !status || !signature) {
-    throw new ApiError(400, "Missing required fields: orderNumber, paymentId, amount, status, and signature are required");
+  if (!orderId) {
+    throw new ApiError(400, "Order ID is required");
   }
 
-  // Validate amount
-  if (isNaN(amount) || Number(amount) <= 0) {
-    throw new ApiError(400, "Invalid amount: must be a positive number");
-  }
-
-  // Validate status
-  const validStatuses = ["SUCCESS", "FAILED", "PENDING", "CANCELLED"];
-  if (!validStatuses.includes(status)) {
-    throw new ApiError(400, "Invalid status: must be one of SUCCESS, FAILED, PENDING, or CANCELLED");
-  }
-
-  // Validate paymentMode if provided
-  if (paymentMode && typeof paymentMode !== 'string') {
-    throw new ApiError(400, "Invalid paymentMode: must be a string");
-  }
-
-  // Check if order exists before creating payment
-  const existingOrder = await Order.findOne({ orderNumber });
-  if (!existingOrder) {
-    throw new ApiError(404, "Order not found with the provided orderNumber");
-  }
-
-  // Check for duplicate payment
-  const existingPayment = await Payment.findOne({ paymentId });
-  if (existingPayment) {
-    throw new ApiError(409, "Payment with this paymentId already exists");
-  }
-
-  // Verify signature (adjust this logic based on your signature generation method)
-  const data = orderNumber + amount + paymentId + status;
-  const generatedSignature = crypto
-    .createHmac("sha256", process.env.CASHFREE_SECRET_KEY)
-    .update(data)
-    .digest("base64");
-
-  if (generatedSignature !== signature) {
-    throw new ApiError(403, "Invalid signature: Payment verification failed");
-  }
-
-  // Create payment record
-  const payment = await Payment.create({
-    orderId: orderNumber,
-    paymentId,
-    amount: Number(amount),
-    paymentMode,
-    status: status === "SUCCESS" ? "success" : "failed",
-    signature,
-  });
-
-  if (!payment) {
-    throw new ApiError(500, "Payment creation failed");
-  }
-
-  // Update order with payment information
-  const orderStatus = status === "SUCCESS" ? "paid" : "unpaid";
-  const order = await Order.findOneAndUpdate(
-    { orderNumber },
-    { 
-      paymentStatus: orderStatus, 
-      paymentInfo: payment._id 
-    },
-    { new: true }
-  );
+  // Fetch order with payment info populated
+  const order = await Order.findOne({ orderNumber: orderId }).populate("paymentInfo");
 
   if (!order) {
-    // Rollback: delete the created payment if order update fails
-    await Payment.findByIdAndDelete(payment._id);
-    throw new ApiError(500, "Order update failed");
+    throw new ApiError(404, "Order not found");
   }
-  window.alert("Payment success")
 
-  res.status(200).json(
-    new ApiResponse(200, { order, payment }, "Payment verified successfully")
-  );
+  // If payment not done yet
+  if (!order.paymentInfo) {
+    return res.status(200).json({
+      success: true,
+      status: "pending",
+      message: "Payment is not completed yet",
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    status: order.paymentStatus, // "paid" or "unpaid"
+    orderNumber: order.orderNumber,
+    payment: {
+      paymentId: order.paymentInfo.paymentId,
+      status: order.paymentInfo.status,
+      mode: order.paymentInfo.paymentMode,
+      amount: order.paymentInfo.amount,
+    },
+  });
 });
+
 const getPaymentDetails = asyncHandler(async (req, res) => {
   const { paymentId } = req.params;
 

@@ -4,9 +4,9 @@ import { cancelOrder, createOrderFromCart, getAllOrders, getDistributorOrders, g
 import { isAdmin, isAdminOrDistributor } from "../middleware/role.middleware.js";
 const router=Router();
 router.use(verifyJWT);
-router.post("/createorder",createOrderFromCart);
-router.get("/my-orders",getMyOrders);
-router.get("/:orderId",getOrderById)
+router.post("/create-order",createOrderFromCart);
+router.get("/o/:orderId",getOrderById)
+router.get("/myorders",getMyOrders);
 router.get("/order-number/:orderNumber",getOrderByOrderNumber);
 router.patch("/:orderId/cancel",cancelOrder);
 // DISTRIBUTOR ROUTES

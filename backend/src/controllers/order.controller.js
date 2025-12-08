@@ -1,4 +1,5 @@
 import { Cart } from "../models/cart.model.js";
+import { Inventory } from "../models/inventory.model.js";
 import { Order } from "../models/order.model.js";
 import { Product } from "../models/product.model.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -67,7 +68,19 @@ const createOrderFromCart = asyncHandler(async (req, res) => {
     if (!product.isActive) {
       throw new ApiError(400, `Product is not available: ${product.name}`);
     }
+ const inventory = await Inventory.findOne({
+      distributorId,
+      productId: item.productId
+    });
 
+    if (!inventory) {
+      throw new ApiError(404, `Inventory not found for product: ${product.name}`);
+    }
+
+    // Check inventory quantity
+    if (inventory.quantity < item.qty) {
+      throw new ApiError(400, `Insufficient stock for ${product.name}. Available: ${inventory.quantity}, Required: ${item.qty}`);
+    }
     // Check stock availability
     if (product.stock < item.qty) {
       throw new ApiError(400, `Insufficient stock for ${product.name}. Available: ${product.stock}, Required: ${item.qty}`);
@@ -125,6 +138,10 @@ const createOrderFromCart = asyncHandler(async (req, res) => {
       await Product.findByIdAndUpdate(
         item.productId,
         { $inc: { stock: -item.qty } }
+      );
+  await Inventory.findOneAndUpdate(
+        { distributorId, productId: item.productId },
+        { $inc: { quantity: -item.qty } }
       );
     }
 
@@ -476,6 +493,10 @@ const cancelOrder = asyncHandler(async (req, res) => {
     await Product.findByIdAndUpdate(
       item.productId,
       { $inc: { stock: item.qty } }
+    );
+     await Inventory.findOneAndUpdate(
+      { distributorId: order.distributorId, productId: item.productId },
+      { $inc: { quantity: item.qty } }
     );
   }
 

@@ -341,6 +341,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
     await Payment.findByIdAndDelete(payment._id);
     throw new ApiError(500, "Order update failed");
   }
+  window.alert("Payment success")
 
   res.status(200).json(
     new ApiResponse(200, { order, payment }, "Payment verified successfully")

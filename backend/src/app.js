@@ -23,7 +23,7 @@ import distributorRouter from "./routes/distributor.routes.js"
 import authRouter from "./routes/auth.routes.js"
 import invertory from "./routes/inventory.routes.js"
 import paymentRouter from "./routes/payment.routes.js";
-import webhookRouter from "./routes/webhook.routes.js"
+import orderRouter from "./routes/order.routes.js"
 
 
 
@@ -37,7 +37,8 @@ app.use('/api/v1/address',addressRouter);
 app.use('/api/v1/distributors',distributorRouter);
 app.use("/api/v1/inventory",invertory)
 app.use("/api/v1/payment",paymentRouter)
-app.use("/api/v1/webhook",webhookRouter)
+app.use("/api/v1/order",orderRouter)
+
 
 
 

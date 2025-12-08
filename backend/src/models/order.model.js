@@ -30,7 +30,7 @@ const orderSchema = new Schema({
       ref: "Product",
       required: true
     },
-    quantity: {
+    qty: {
       type: Number,
       required: true,
       min: 1
@@ -98,16 +98,7 @@ orderSchema.pre('save',function(next){
      const randomPort=Math.floor(1000+Math.random()*9000);
      this.orderNumber=`ORD-${Date.now()}+${randomPort}`
    }
-   let total;
-   this.products=this.products.map((item)=>{
-    const price=Number(item.price)||0;
-    const qty=Number(item.quantity)||0;
-    const itemTotal=price*qty;
-    item.totalPrice=itemTotal;
-    total+=itemTotal
-    return item;
-   })
-  this.totalAmount=total;
+   
   if(this.status==="confirmed"&&!this.confirmedAt){
     this.confirmedAt=new Date()
   }

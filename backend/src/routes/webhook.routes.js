@@ -4,6 +4,6 @@ import verifyJWT from "../middleware/auth.middleware.js";
 
 const router =Router();
 router.use(verifyJWT)
-router.route("/cashfree", cashfreeWebHook);
+router.post("/cashfree", cashfreeWebHook);
 
 export default router;

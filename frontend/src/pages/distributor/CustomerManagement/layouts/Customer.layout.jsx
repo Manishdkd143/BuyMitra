@@ -14,7 +14,7 @@ import {
 import DistributorHeader from "../../../../layouts/DistributorHeader"; // same header
 import { useAuth } from "../../../../context/AuthContext";
 
-const RetailerLayout = () => {
+const CustomerLayout = () => {
   const { logout } = useAuth();
 
   const linkClass = ({ isActive }) =>
@@ -57,37 +57,37 @@ const RetailerLayout = () => {
               <LayoutDashboard className="w-4 h-4" />
               Dashboard
             </NavLink>
- {/* ===== RETAILER MANAGEMENT (CORE) ===== */}
-            <p className={sectionTitle}>Retailer Management</p>
+ {/* ===== Customer MANAGEMENT (CORE) ===== */}
+            <p className={sectionTitle}>Customer Management</p>
 
-            <NavLink to="/retailer/retailers/add" className={linkClass}>
+            <NavLink to="/c/customers/add" className={linkClass}>
               <UserPlus className="w-4 h-4" />
-              Add Retailer
+              Add Customer
             </NavLink>
 
-            <NavLink to="/distributor/retailers/manage/all" className={linkClass}>
+            <NavLink to="/distributor/customers/manage/all" className={linkClass}>
               <Users className="w-4 h-4" />
-              Retailer List
+              Customer List
             </NavLink>
 
-            <NavLink to="/retailer/retailers/pending" className={linkClass}>
+            <NavLink to="/c/customers/pending" className={linkClass}>
               <UserCheck className="w-4 h-4" />
               Pending Approvals
             </NavLink>
 
-            <NavLink to="/retailer/retailers/ledger" className={linkClass}>
+            <NavLink to="/customer/customers/ledger" className={linkClass}>
               <IndianRupee className="w-4 h-4" />
-              Retailer Ledger
+              Customer Ledger
             </NavLink>
 
-            <NavLink to="/retailer/retailers/activity" className={linkClass}>
+            <NavLink to="/c/customers/activity" className={linkClass}>
               <ListChecks className="w-4 h-4" />
-              Retailer Activity
+              Customer Activity
             </NavLink>
 
             {/* PAYMENTS */}
             <p className={sectionTitle}>Finance</p>
-            <NavLink to="/retailer/payments" className={linkClass}>
+            <NavLink to="/customer/payments" className={linkClass}>
               <IndianRupee className="w-4 h-4" />
               Payments
             </NavLink>
@@ -95,12 +95,7 @@ const RetailerLayout = () => {
 
            
 
-            {/* PROFILE */}
-            <p className={sectionTitle}>Account</p>
-            <NavLink to="/retailer/profile" className={linkClass}>
-              <FileText className="w-4 h-4" />
-              Business Profile
-            </NavLink>
+           
           </nav>
 
           {/* LOGOUT */}
@@ -125,4 +120,4 @@ const RetailerLayout = () => {
   );
 };
 
-export default RetailerLayout;
+export default CustomerLayout;

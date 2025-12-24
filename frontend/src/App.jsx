@@ -33,8 +33,8 @@ import BulkUpload from "./pages/distributor/products/BulkUploadProducts";
 import EditCompanyProfile from "./pages/distributor/EditComProfile";
 import CompanyProfile from "./pages/distributor/CompanyProfile";
 import EditProduct from "./pages/distributor/products/EditProduct";
-import RetailerLayout from "./pages/distributor/retailerManagement/layouts/Retailer.layout";
-import RetailersList from "./pages/distributor/retailerManagement/RetailersList";
+import CustomerLayout from "./pages/distributor/CustomerManagement/layouts/Customer.layout";
+import CustomersList from "./pages/distributor/CustomerManagement/CustomersList";
 function App() {
   return (
     <>
@@ -93,12 +93,12 @@ function App() {
             <Route path="bulk-upload" element={<BulkUpload/>}/>
             <Route path="edit/:productId" element={<EditProduct />}/>
             </Route>
-          //Retailer Management
-          <Route path="/distributor/retailers/manage" element={ <ProtectedRoute allowedRoles={["distributor"]}>
-           <RetailerLayout/>
+          //Customer Management
+          <Route path="/distributor/customers/manage" element={ <ProtectedRoute allowedRoles={["distributor"]}>
+           <CustomerLayout/>
           </ProtectedRoute>}>
-          <Route path="all" element={<RetailersList/>}/>
-
+          <Route path="all" element={<CustomersList/>}/>
+           
           </Route>
       </Routes>
      

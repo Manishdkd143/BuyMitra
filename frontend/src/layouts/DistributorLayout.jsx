@@ -57,9 +57,9 @@ const DistributorLayout = () => {
               Order Management
             </NavLink>
 
-            <NavLink to="/distributor/retailers/manage" className={linkClass}>
+            <NavLink to="/distributor/customers/manage" className={linkClass}>
               <Users className="w-5 h-5" />
-              Retailer Management
+              Customer Management
             </NavLink>
 
             <NavLink to="/distributor/profile" className={linkClass}>

@@ -18,9 +18,8 @@ import jwt from "jsonwebtoken"
 //     }
 // },{_id:false})
 const addressSchema = new Schema({
-    street: { type: String, trim: true },
     city: { type: String, trim: true, required: true },
-    state: { type: String, trim: true, required: true },
+    state: { type: String, trim: true },
     pincode: { type: Number, required: true },
     country: { type: String, default: "India" }
 }, { _id: false });

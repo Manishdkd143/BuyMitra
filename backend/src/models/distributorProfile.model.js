@@ -34,7 +34,6 @@ const distributorProfileSchema = new Schema({
     },
     businessName: {
         type: String,
-       
         trim: true,
          required: function() {
         return this.status === "approved";
@@ -75,6 +74,10 @@ const distributorProfileSchema = new Schema({
         return this.status === "approved";
     },
 },
+businessType:{
+    type:String,
+    required:true,
+},
     documents: [docSchema],
 
     approval: {
@@ -88,7 +91,7 @@ const distributorProfileSchema = new Schema({
         type: String,
         enum: ["pending", "approved", "rejected"],
         default: "pending"
-    }
+    },
 
 }, { timestamps: true });
 

@@ -1,26 +1,37 @@
 import Router from "express";
 import verifyJWT from "../middleware/auth.middleware.js";
-import { isAdminOrDistributor } from "../middleware/role.middleware.js";
+import { isAdmin, isAdminOrDistributor } from "../middleware/role.middleware.js";
 
 import {
+  addRetailer,
   approveRetailer,
+  deleteDistributorDocument,
   exportsProductsToExcel,
   getAllApprovedDistributors,
   getDistributorOrderById,
   getDistributorOrders,
   getDistributorProductById,
   getDistributorProducts,
-  getDistributorProfile,
+  getCompanyProfile,
   getDistributorsRetailers,
-  getInventoryReports,
+  getDashboardReports,
   getRetailerById,
+  getTopRetailers,
   OrderStatusChange,
   updateDistributor,
-  updateWholesalePricing
+  updateWholesalePricing,
+  uploadDistributorDocs,
+  verifyDistributorDocument
 } from "../controllers/distributor.controller.js";
-import { getAllApprovedDistributor } from "../controllers/admin.controller.js";
+
+
+import { updateProfilePic } from "../controllers/user.controller.js";
+import { Upload } from "../middleware/multer.middleware.js";
+import { bulkUploadProducts} from "../controllers/product.controller.js";
 
 const router = Router();
+
+console.log(" Distributor Router Loaded");
 
 // All distributor routes protected by JWT
 router.use(verifyJWT);
@@ -28,73 +39,104 @@ router.use(verifyJWT);
 /* -----------------------------
    PROFILE
 ------------------------------ */
-router
-  .route("/profile")
-  .get(isAdminOrDistributor, getDistributorProfile);
+router.get("/companyprofile", isAdminOrDistributor, getCompanyProfile);
 
-router
-  .route("/update")
-  .patch(isAdminOrDistributor, updateDistributor);
+router.patch(
+  "/changeprofile",
+  Upload.single("profilePic"),
+  updateProfilePic
+);
+
+router.patch("/update", isAdminOrDistributor, updateDistributor);
 
 /* -----------------------------
    RETAILERS
 ------------------------------ */
-router
-  .route("/retailers")
-  .get(isAdminOrDistributor, getDistributorsRetailers);
+router.get("/retailers", isAdminOrDistributor, getDistributorsRetailers);
 
-router
-  .route("/retailer/:retailerId")
-  .get(isAdminOrDistributor, getRetailerById);
+router.post("/add-retailer", addRetailer);
 
-router
-  .route("/retailers/approve/:retailerId")
-  .put(isAdminOrDistributor, approveRetailer);
+router.get("/retailer/:retailerId", isAdminOrDistributor, getRetailerById);
+
+router.put(
+  "/retailers/approve/:retailerId",
+  isAdminOrDistributor,
+  approveRetailer
+);
 
 /* -----------------------------
    PRODUCTS
 ------------------------------ */
-router
-  .route("/products")
-  .get(isAdminOrDistributor, getDistributorProducts);
+router.get("/products", isAdminOrDistributor, getDistributorProducts);
 
-router
-  .route("/products/:productId")
-  .get(isAdminOrDistributor, getDistributorProductById);
+router.get(
+  "/product/:productId",
+  isAdminOrDistributor,
+  getDistributorProductById
+);
 
-router
-  .route("/products/wholePrice")
-  .put(isAdminOrDistributor, updateWholesalePricing);
+router.put(
+  "/products/wholePrice",
+  isAdminOrDistributor,
+  updateWholesalePricing
+);
 
+//inventory related routes are moved to inventory.routes.js
+// router.get("/inventory/low-stock", isAdminOrDistributor, lowStockProducts)
 /* -----------------------------
    ORDERS
 ------------------------------ */
-router
-  .route("/orders")
-  .get(isAdminOrDistributor, getDistributorOrders);
+router.get("/orders", isAdminOrDistributor, getDistributorOrders);
 
-router
-  .route("/orders/:id")
-  .get(isAdminOrDistributor, getDistributorOrderById);
+router.get("/order/:id", isAdminOrDistributor, getDistributorOrderById);
 
-router
-  .route("/orders/status/:id")
-  .put(isAdminOrDistributor, OrderStatusChange);
+router.put("/order/status/:id", isAdminOrDistributor, OrderStatusChange);
 
 /* -----------------------------
    INVENTORY REPORT
 ------------------------------ */
-router
-  .route("/inventory/report")
-  .get(isAdminOrDistributor, getInventoryReports);
+// router.get("/report", isAdminOrDistributor, getDistributorDashboard);
+
+router.get("/top-retailers", getTopRetailers);
 
 /* -----------------------------
    EXPORT PRODUCTS TO EXCEL
 ------------------------------ */
-router
-  .route("/products/export/excel")
-  .get(isAdminOrDistributor, exportsProductsToExcel);
+router.get(
+  "/products/export/excel",
+  isAdminOrDistributor,
+  exportsProductsToExcel
+);
 
-  router.route("/approved").get(getAllApprovedDistributors)
+/* -----------------------------
+   APPROVED DISTRIBUTORS
+------------------------------ */
+router.get("/approved", getAllApprovedDistributors);
+
+/* -----------------------------
+   DOCUMENTS SECTION (FIXED)
+------------------------------ */
+router.put(
+  "/documents",
+  Upload.array("documents", 10),
+  uploadDistributorDocs
+);
+
+router.delete("/documents/:docId", deleteDistributorDocument);
+
+router.patch(
+  "/documents/verify/:docId",
+  isAdmin,
+  verifyDistributorDocument
+);
+router.post(
+  "/bulkupload",
+  Upload.single("file"),
+  isAdminOrDistributor,
+  bulkUploadProducts
+);
+
+router.get("/reports", isAdminOrDistributor, getDashboardReports);
+console.log(" Distributor Routes Ready");
 
 export default router;

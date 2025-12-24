@@ -1,579 +1,241 @@
+import mongoose from "mongoose";
 import { Cart } from "../models/cart.model.js";
 import { Inventory } from "../models/inventory.model.js";
 import { Order } from "../models/order.model.js";
 import { Product } from "../models/product.model.js";
+import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
-const generateOrderNumber = () => {
-  const timestamp = Date.now().toString();
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `ORD${timestamp}${random}`;
+
+/* -------------------- HELPERS -------------------- */
+
+const reduceInventory = async (distributorId, productId, qty) => {
+  const inventory = await Inventory.findOne({ distributorId, productId });
+  if (!inventory) throw new ApiError(404, "Inventory not found");
+  if (inventory.quantity < qty) {
+    throw new ApiError(400, "Insufficient stock");
+  }
+  inventory.quantity -= qty;
+  await inventory.save();
 };
+
+const restoreInventory = async (distributorId, products) => {
+  for (const item of products) {
+    await Inventory.findOneAndUpdate(
+      { distributorId, productId: item.productId },
+      { $inc: { quantity: item.qty } }
+    );
+  }
+};
+
+/* -------------------- CREATE ORDER -------------------- */
+
 const createOrderFromCart = asyncHandler(async (req, res) => {
-  const { 
-    distributorId,
-    shippingAddress, 
-    paymentMethod = 'cod',
-    orderNotes
-  } = req.body;
-
   const userId = req.user._id;
+  const { distributorId, shippingAddress, paymentMethod = "cod", orderNotes } = req.body;
 
-  // Validate required fields
-  if (!distributorId) {
-    throw new ApiError(400, "Distributor ID is required");
+  if (!mongoose.isValidObjectId(distributorId)) {
+    throw new ApiError(400, "Invalid distributor ID");
   }
 
-  if (!shippingAddress) {
-    throw new ApiError(400, "Shipping address is required");
+  if (
+    !shippingAddress?.name ||
+    !shippingAddress?.phone ||
+    !shippingAddress?.city ||
+    !shippingAddress?.state ||
+    !shippingAddress?.pincode
+  ) {
+    throw new ApiError(400, "Complete shipping address required");
   }
 
-  // Validate shipping address fields
-  const { name, phone, city, state, pincode } = shippingAddress;
-  if (!name || !phone  || !city || !state || !pincode) {
-    throw new ApiError(400, "Complete shipping address is required (name, phone,city, state, pincode)");
-  }
-
-  // Validate phone number (10 digits)
-  const phoneRegex = /^[6-9]\d{9}$/;
-  if (!phoneRegex.test(phone)) {
-    throw new ApiError(400, "Invalid phone number. Must be 10 digits starting with 6-9");
-  }
-
-  // Validate payment method
-  const validPaymentMethods = ['cod', 'online', 'credit', 'bank_transfer'];
-  if (!validPaymentMethods.includes(paymentMethod)) {
-    throw new ApiError(400, "Invalid payment method");
-  }
-
-  // Get user's cart
-  const cart = await Cart.findOne({ userId }).populate('items.productId');
-
+  const cart = await Cart.findOne({ userId }).populate("items.productId");
   if (!cart || cart.items.length === 0) {
-    throw new ApiError(400, "Cart is empty. Please add items to cart before placing order");
+    throw new ApiError(400, "Cart is empty");
   }
 
-  // Validate cart items and check stock
   const products = [];
   let totalAmount = 0;
-  
+
   for (const item of cart.items) {
-    const product = await Product.findById(item.productId);
+    const product = item.productId;
 
-    if (!product) {
-      throw new ApiError(404, `Product not found: ${item.productId}`);
-    }
-
-    if (!product.status) {
-      throw new ApiError(400, `Product is not available: ${product.name}`);
-    }
- const inventory = await Inventory.findOne({
-      distributorId,
-      productId: item.productId
-    });
-
-    if (!inventory) {
-      throw new ApiError(404, `Inventory not found for product: ${product.name}`);
-    }
-
-    // Check inventory quantity
-    if (inventory.quantity < item.qty) {
-      throw new ApiError(400, `Insufficient stock for ${product.name}. Available: ${inventory.quantity}, Required: ${item.qty}`);
-    }
-    // Check stock availability
-    if (product.stock < item.qty) {
-      throw new ApiError(400, `Insufficient stock for ${product.name}. Available: ${product.stock}, Required: ${item.qty}`);
-    }
-
-    // Check minimum order quantity for wholesale
-    if (product.minOrderQty && item.qty < product.minOrderQty) {
-      throw new ApiError(400, `Minimum order quantity for ${product.name} is ${product.minOrderQuantity}`);
-    }
+    // 🔴 INVENTORY CHECK & REDUCE
+    await reduceInventory(distributorId, product._id, item.qty);
 
     const itemTotal = item.price * item.qty;
     totalAmount += itemTotal;
 
     products.push({
-      productId: item.productId._id,
+      productId: product._id,
       qty: item.qty,
       price: item.price,
       totalPrice: itemTotal,
     });
   }
 
-  // Validate total amount
-  if (totalAmount <= 0) {
-    throw new ApiError(400, "Invalid order total");
-  }
+  const order = await Order.create({
+    distributorId,
+    userId,
+    products,
+    totalAmount,
+    shippingAddress,
+    paymentMethod,
+    paymentStatus: paymentMethod === "cod" ? "unpaid" : "unpaid",
+    status: "pending",
+    orderNotes,
+  });
 
-  try {
-    // Create order (orderNumber will be auto-generated by pre-save hook)
-    const orderNumber=generateOrderNumber()
-    if(!orderNumber){
-      throw new ApiError(400,"order number generated failed!")
-    }
-    const order = await Order.create({
-      orderNumber,
-      distributorId,
-      userId,
-      products,
-      totalAmount,
-      shippingAddress: {
-        name: name.trim(),
-        phone: phone.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        pincode: pincode.trim(),
-        landmark: shippingAddress.landmark?.trim() || '',
-      },
-      paymentMethod: paymentMethod.toLowerCase(),
-      paymentStatus: paymentMethod === 'cod' ? 'unpaid' : 'unpaid',
-      status: 'pending',
-      orderNotes: orderNotes?.trim() || '',
-    });
+  await Cart.findByIdAndUpdate(cart._id, { items: [] });
 
-    if (!order) {
-      throw new ApiError(500, "Failed to create order");
-    }
+  const populatedOrder = await Order.findById(order._id)
+    .populate("userId", "name email phone")
+    .populate("distributorId", "name businessName")
+    .populate("products.productId", "name images sku");
 
-    // Update product stock
-    for (const item of products) {
-      await Product.findByIdAndUpdate(
-        item.productId,
-        { $inc: { stock: -item.qty } }
-      );
-  await Inventory.findOneAndUpdate(
-        { distributorId, productId: item.productId },
-        { $inc: { quantity: -item.qty } }
-      );
-    }
-
-    // Clear user's cart
-    await Cart.findByIdAndUpdate(cart._id, {
-      items: [],
-      itemsTotal: 0,
-      tax: 0,
-      discount: 0,
-      shippingCharge: 0,
-      grandTotal: 0,
-      coupon: { code: null, discountAmount: 0 }
-    });
-
-    const populatedOrder = await Order.findById(order._id)
-      .populate('userId', 'name email phone')
-      .populate('distributorId', 'name email phone businessName')
-      .populate('products.productId', 'name images category sku');
-
-    res.status(201).json(
-      new ApiResponse(201, populatedOrder, "Order created successfully")
-    );
-
-  } catch (error) {
-    console.error("Order Creation Error:", error);
-    throw new ApiError(500, error.message || "Failed to create order");
-  }
+  return res.status(201).json(
+    new ApiResponse(201, populatedOrder, "Order placed successfully")
+  );
 });
+
+/* -------------------- GET ORDER BY ID -------------------- */
+
 const getOrderById = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
 
-  if (!orderId) {
-    throw new ApiError(400, "Order ID is required");
-  }
-
   const order = await Order.findById(orderId)
-    .populate('userId', 'name email phone')
-    .populate('distributorId', 'name email phone businessName')
-    .populate('products.productId', 'name images category sku')
-    .populate('paymentInfo');
+    .populate("userId", "name email phone")
+    .populate("distributorId", "name businessName")
+    .populate("products.productId", "name images sku")
+    .populate("paymentInfo");
 
-  if (!order) {
-    throw new ApiError(404, "Order not found");
-  }
+  if (!order) throw new ApiError(404, "Order not found");
 
-  // Check authorization
-  const isAuthorized = 
+  const isAuthorized =
     order.userId._id.toString() === req.user._id.toString() ||
     order.distributorId._id.toString() === req.user._id.toString() ||
-    req.user.role === 'admin';
+    req.user.role === "admin";
 
-  if (!isAuthorized) {
-    throw new ApiError(403, "Not authorized to view this order");
-  }
+  if (!isAuthorized) throw new ApiError(403, "Not authorized");
 
-  res.status(200).json(
-    new ApiResponse(200, order, "Order retrieved successfully")
+  return res.status(200).json(
+    new ApiResponse(200, order, "Order fetched successfully")
   );
 });
-const getOrderByOrderNumber = asyncHandler(async (req, res) => {
-  const { orderNumber } = req.params;
 
-  if (!orderNumber) {
-    throw new ApiError(400, "Order number is required");
-  }
+/* -------------------- MY ORDERS (RETAILER) -------------------- */
 
-  const order = await Order.findOne({ orderNumber })
-    .populate('userId', 'name email phone')
-    .populate('distributorId', 'name email phone businessName')
-    .populate('products.productId', 'name images category sku')
-    .populate('paymentInfo');
-
-  if (!order) {
-    throw new ApiError(404, "Order not found");
-  }
-
-  // Check authorization
-  const isAuthorized = 
-    order.userId._id.toString() === req.user._id.toString() ||
-    order.distributorId._id.toString() === req.user._id.toString() ||
-    req.user.role === 'admin';
-
-  if (!isAuthorized) {
-    throw new ApiError(403, "Not authorized to view this order");
-  }
-
-  res.status(200).json(
-    new ApiResponse(200, order, "Order retrieved successfully")
-  );
-});
 const getMyOrders = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, status, paymentStatus, startDate, endDate } = req.query;
+  const { page = 1, limit = 10 } = req.query;
 
-  const query = { userId: req.user._id };
-
-  if (status) {
-    query.status = status;
-  }
-
-  if (paymentStatus) {
-    query.paymentStatus = paymentStatus;
-  }
-
-  if (startDate || endDate) {
-    query.createdAt = {};
-    if (startDate) {
-      query.createdAt.$gte = new Date(startDate);
-    }
-    if (endDate) {
-      query.createdAt.$lte = new Date(endDate);
-    }
-  }
-
-  const orders = await Order.find(query)
-    .populate('distributorId', 'name businessName')
-    .populate('products.productId', 'name images')
-    .populate('paymentInfo')
+  const orders = await Order.find({ userId: req.user._id })
+    .populate("distributorId", "name businessName")
+    .populate("products.productId", "name images")
     .sort({ createdAt: -1 })
-    .limit(limit * 1)
-    .skip((page - 1) * limit);
+    .skip((page - 1) * limit)
+    .limit(Number(limit));
 
-  const count = await Order.countDocuments(query);
+  const total = await Order.countDocuments({ userId: req.user._id });
 
-  res.status(200).json(
+  return res.status(200).json(
     new ApiResponse(200, {
       orders,
-      totalPages: Math.ceil(count / limit),
+      total,
       currentPage: Number(page),
-      totalOrders: count,
-    }, "Orders retrieved successfully")
+      totalPages: Math.ceil(total / limit),
+    }, "My orders fetched")
   );
 });
+
+/* -------------------- DISTRIBUTOR ORDERS -------------------- */
+
 const getDistributorOrders = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, status, paymentStatus, startDate, endDate } = req.query;
+  const { page = 1, limit = 10 } = req.query;
 
-  const query = { distributorId: req.user._id };
-
-  if (status) {
-    query.status = status;
-  }
-
-  if (paymentStatus) {
-    query.paymentStatus = paymentStatus;
-  }
-
-  if (startDate || endDate) {
-    query.createdAt = {};
-    if (startDate) {
-      query.createdAt.$gte = new Date(startDate);
-    }
-    if (endDate) {
-      query.createdAt.$lte = new Date(endDate);
-    }
-  }
-
-  const orders = await Order.find(query)
-    .populate('userId', 'name email phone')
-    .populate('products.productId', 'name images')
-    .populate('paymentInfo')
+  const orders = await Order.find({ distributorId: req.user._id })
+    .populate("userId", "name phone")
+    .populate("products.productId", "name images")
     .sort({ createdAt: -1 })
-    .limit(limit * 1)
-    .skip((page - 1) * limit);
+    .skip((page - 1) * limit)
+    .limit(Number(limit));
 
-  const count = await Order.countDocuments(query);
+  const total = await Order.countDocuments({ distributorId: req.user._id });
 
-  // Calculate total revenue
-  const totalRevenue = await Order.aggregate([
-    { $match: { ...query, paymentStatus: 'paid' } },
-    { $group: { _id: null, total: { $sum: '$totalAmount' } } }
-  ]);
-
-  res.status(200).json(
+  return res.status(200).json(
     new ApiResponse(200, {
       orders,
-      totalPages: Math.ceil(count / limit),
+      total,
       currentPage: Number(page),
-      totalOrders: count,
-      totalRevenue: totalRevenue[0]?.total || 0,
-    }, "Orders retrieved successfully")
+      totalPages: Math.ceil(total / limit),
+    }, "Distributor orders fetched")
   );
 });
-const getAllOrders = asyncHandler(async (req, res) => {
-  const { 
-    page = 1, 
-    limit = 10, 
-    status, 
-    paymentStatus,
-    startDate, 
-    endDate,
-    search 
-  } = req.query;
 
-  const query = {};
+/* -------------------- UPDATE ORDER STATUS -------------------- */
 
-  if (status) {
-    query.status = status;
-  }
-
-  if (paymentStatus) {
-    query.paymentStatus = paymentStatus;
-  }
-
-  if (startDate || endDate) {
-    query.createdAt = {};
-    if (startDate) {
-      query.createdAt.$gte = new Date(startDate);
-    }
-    if (endDate) {
-      query.createdAt.$lte = new Date(endDate);
-    }
-  }
-
-  if (search) {
-    query.orderNumber = { $regex: search, $options: 'i' };
-  }
-
-  const orders = await Order.find(query)
-    .populate('userId', 'name email phone')
-    .populate('distributorId', 'name businessName')
-    .populate('products.productId', 'name images')
-    .populate('paymentInfo')
-    .sort({ createdAt: -1 })
-    .limit(limit * 1)
-    .skip((page - 1) * limit);
-
-  const count = await Order.countDocuments(query);
-
-  const totalRevenue = await Order.aggregate([
-    { $match: { ...query, paymentStatus: 'paid' } },
-    { $group: { _id: null, total: { $sum: '$totalAmount' } } }
-  ]);
-
-  res.status(200).json(
-    new ApiResponse(200, {
-      orders,
-      totalPages: Math.ceil(count / limit),
-      currentPage: Number(page),
-      totalOrders: count,
-      totalRevenue: totalRevenue[0]?.total || 0,
-    }, "Orders retrieved successfully")
-  );
-});
 const updateOrderStatus = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   const { status, trackingNumber } = req.body;
 
-  if (!orderId) {
-    throw new ApiError(400, "Order ID is required");
-  }
+  const validStatuses = [
+    "pending",
+    "confirmed",
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
+  ];
 
-  if (!status) {
-    throw new ApiError(400, "Status is required");
-  }
-
-  const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
   if (!validStatuses.includes(status)) {
-    throw new ApiError(400, "Invalid status");
+    throw new ApiError(400, "Invalid order status");
   }
 
   const order = await Order.findById(orderId);
+  if (!order) throw new ApiError(404, "Order not found");
 
-  if (!order) {
-    throw new ApiError(404, "Order not found");
-  }
-
-  // Check authorization (distributor or admin)
-  const isAuthorized = 
-    order.distributorId.toString() === req.user._id.toString() ||
-    req.user.role === 'admin';
-
-  if (!isAuthorized) {
-    throw new ApiError(403, "Not authorized to update this order");
-  }
-
-  // Don't allow status change if delivered or cancelled
-  if (order.status === 'delivered' || order.status === 'cancelled') {
-    throw new ApiError(400, `Cannot update order that is ${order.status}`);
+  if (status === "cancelled" && order.status !== "cancelled") {
+    await restoreInventory(order.distributorId, order.products);
   }
 
   order.status = status;
-
-  if (trackingNumber) {
-    order.trackingNumber = trackingNumber;
-  }
-
-  // If cancelled, restore stock
-  if (status === 'cancelled' && order.status !== 'cancelled') {
-    for (const item of order.products) {
-      await Product.findByIdAndUpdate(
-        item.productId,
-        { $inc: { stock: item.qty } }
-      );
-    }
-  }
+  if (trackingNumber) order.trackingNumber = trackingNumber;
 
   await order.save();
 
-  const updatedOrder = await Order.findById(orderId)
-    .populate('userId', 'name email phone')
-    .populate('distributorId', 'name businessName')
-    .populate('products.productId', 'name images');
-
-  res.status(200).json(
-    new ApiResponse(200, updatedOrder, "Order status updated successfully")
+  return res.status(200).json(
+    new ApiResponse(200, order, "Order status updated")
   );
 });
+
+/* -------------------- CANCEL ORDER -------------------- */
+
 const cancelOrder = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
-  const { reason } = req.body;
-
-  if (!orderId) {
-    throw new ApiError(400, "Order ID is required");
-  }
 
   const order = await Order.findById(orderId);
+  if (!order) throw new ApiError(404, "Order not found");
 
-  if (!order) {
-    throw new ApiError(404, "Order not found");
+  if (["delivered", "cancelled"].includes(order.status)) {
+    throw new ApiError(400, "Order cannot be cancelled");
   }
 
-  // Check authorization
-  const isAuthorized = 
-    order.userId.toString() === req.user._id.toString() ||
-    order.distributorId.toString() === req.user._id.toString() ||
-    req.user.role === 'admin';
+  await restoreInventory(order.distributorId, order.products);
 
-  if (!isAuthorized) {
-    throw new ApiError(403, "Not authorized to cancel this order");
-  }
-
-  if (order.status === 'delivered') {
-    throw new ApiError(400, "Cannot cancel delivered order");
-  }
-
-  if (order.status === 'cancelled') {
-    throw new ApiError(400, "Order is already cancelled");
-  }
-
-  if (!['pending', 'confirmed', 'processing'].includes(order.status)) {
-    throw new ApiError(400, "Order cannot be cancelled at this stage");
-  }
-
-  order.status = 'cancelled';
-  order.orderNotes = (order.orderNotes ? order.orderNotes + '\n' : '') + 
-                     `Cancellation reason: ${reason || 'No reason provided'}`;
-
-  // Restore stock
-  for (const item of order.products) {
-    await Product.findByIdAndUpdate(
-      item.productId,
-      { $inc: { stock: item.qty } }
-    );
-     await Inventory.findOneAndUpdate(
-      { distributorId: order.distributorId, productId: item.productId },
-      { $inc: { quantity: item.qty } }
-    );
-  }
-
+  order.status = "cancelled";
   await order.save();
 
-  const updatedOrder = await Order.findById(orderId)
-    .populate('userId', 'name email phone')
-    .populate('distributorId', 'name businessName')
-    .populate('products.productId', 'name images');
-
-  res.status(200).json(
-    new ApiResponse(200, updatedOrder, "Order cancelled successfully")
+  return res.status(200).json(
+    new ApiResponse(200, order, "Order cancelled & inventory restored")
   );
 });
-const getOrderStats = asyncHandler(async (req, res) => {
-  const { startDate, endDate } = req.query;
 
-  const matchQuery = {};
+/* -------------------- EXPORTS -------------------- */
 
-  // If distributor, show only their orders
-  if (req.user.role !== 'admin') {
-    matchQuery.distributorId = req.user._id;
-  }
-
-  if (startDate || endDate) {
-    matchQuery.createdAt = {};
-    if (startDate) {
-      matchQuery.createdAt.$gte = new Date(startDate);
-    }
-    if (endDate) {
-      matchQuery.createdAt.$lte = new Date(endDate);
-    }
-  }
-
-  const totalOrders = await Order.countDocuments(matchQuery);
-
-  const ordersByStatus = await Order.aggregate([
-    { $match: matchQuery },
-    { $group: { _id: '$status', count: { $sum: 1 } } }
-  ]);
-
-  const revenueStats = await Order.aggregate([
-    { $match: matchQuery },
-    {
-      $group: {
-        _id: '$paymentStatus',
-        totalRevenue: { $sum: '$totalAmount' },
-        count: { $sum: 1 }
-      }
-    }
-  ]);
-
-  const recentOrders = await Order.find(matchQuery)
-    .populate('userId', 'name email')
-    .populate('distributorId', 'name businessName')
-    .sort({ createdAt: -1 })
-    .limit(10);
-
-  res.status(200).json(
-    new ApiResponse(200, {
-      totalOrders,
-      ordersByStatus,
-      revenueStats,
-      recentOrders,
-    }, "Order statistics retrieved successfully")
-  );
-});
-export {createOrderFromCart,
+export {
+  createOrderFromCart,
   getOrderById,
-  getOrderByOrderNumber,
   getMyOrders,
   getDistributorOrders,
-  getAllOrders,
   updateOrderStatus,
   cancelOrder,
-  getOrderStats}
+};

@@ -123,169 +123,308 @@ if (pincode !== undefined) {
     )
   );
 });
-const getDistributorProducts=asyncHandler(async(req,res)=>{
-  const isLoggedUser=req.user;
-  const {page=1,limit=10}=req.query;
-  let skip=(Number(page)-1)*Number(limit)
-  if(!isLoggedUser){
-    throw new ApiError(401,"Unauthorized user!please login")
-  }
-  if(isLoggedUser.role.toLowerCase()==="retailer"){
-    throw new ApiError(403,"Access-denied not allowed retailer!")
-  }
-  const total=await Product.countDocuments({createdBy:isLoggedUser._id})
+const getDistributorProducts = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { page = 1, limit = 10, search = "" } = req.query;
 
-const allProducts=  await Product.find({
-  createdBy:isLoggedUser._id
-},
-{
-  name:1,
-  price:1,
-  wholesalePrice:1,
-  stock:1,
-  thumbnail:1,
-  brand:1,
-  status:1,
-  sku:1,
-  category:1,
-}).sort({createdAt:-1}).skip(skip).limit(limit)
-if(!allProducts){
-  throw new ApiError(404,"Product not found!")
-}
-return res.status(200).json(new ApiResponse(200,{
-   currentPage: Number(page),
-      totalPages: Math.ceil(total / Number(limit)),
-      totalProducts: total,
-      allProducts,
-}))
-
-})
-const getDistributorProductById = asyncHandler(async (req, res) => {
-  const isLoggedUser = req.user;
-  const { productId } = req.params;
-  
-  if (!isLoggedUser) {
+  if (!user) {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
-  
-  if (isLoggedUser.role.toLowerCase() === "retailer") {
+
+  if (user.role.toLowerCase() === "retailer") {
+    throw new ApiError(403, "Access denied for retailer");
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const query = { createdBy: user._id };
+
+  if (search.trim()) {
+    query.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { sku: { $regex: search, $options: "i" } },
+      { brand: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  // const [total, allProducts] = await Promise.all([
+  //   Product.countDocuments(query),
+  //   Product.find(query, {
+  //     name: 1,
+  //     price: 1,
+  //     wholesalePrice: 1,
+  //     thumbnail: 1,
+  //     brand: 1,
+  //     status: 1,
+  //     sku: 1,
+  //     category: 1,
+  //     unit: 1,
+  //     unitsPerBase: 1,
+  //   })
+  //     .populate("category", "name")
+  //     .sort({ createdAt: -1 })
+  //     .skip(skip)
+  //     .limit(Number(limit)),
+  // ]);
+
+  // const productIds = allProducts.map((p) => p._id);
+
+  // const stockArr = await Inventory.find({
+  //   productId: { $in: productIds },
+  //   distributorId: user._id,
+  //   quantity:{$gt:10},
+  // }).select("productId quantity");
+  // const stockMap = {};
+  // stockArr.forEach((s) => {
+  //   stockMap[s.productId.toString()] = s.quantity;
+  // });
+
+  // const products = allProducts.map((p) => ({
+  //   ...p._doc,
+  //   stock: stockMap[p._id.toString()] || 0,
+  // }));
+
+  const productsResult=await Inventory.aggregate([
+    {
+      $match:{
+        distributorId:user._id,
+        quantity:{$gt:10}
+      }
+    },
+    {
+      $lookup:{
+        from:"products",
+        localField:"productId",
+        foreignField:"_id",
+        as:"product"
+      }
+    },
+    {
+      $unwind:"$product"
+    },
+    ...(search?[
+      {
+        $match:{
+          $or:[
+            {"product.name":{$regex:search,$options:"i"}},
+              { "product.sku": { $regex: search, $options: "i" } },
+              { "product.brand": { $regex: search, $options: "i" } },
+          ]
+        }
+      }
+    ]:[]),
+    {
+       $facet: {
+      data: [
+        {
+          $project: {
+            _id:0,
+            quantity: 1,
+            "product._id":1,
+            "product.name": 1,
+            "product.price": 1,
+            "product.wholesalePrice": 1,
+            "product.thumbnail": 1,
+            "product.brand": 1,
+            "product.status": 1,
+            "product.sku": 1,
+            "product.unit":1,
+            "product.unitsPerBase":1,
+            "product.category": 1,
+            "product.createdAt": 1,
+          },
+        },
+        { $sort: { "product.createdAt": -1 } },
+        { $skip: Number(skip) },
+        { $limit: Number(limit) },
+      ],
+      total: [
+        { $count: "count" },
+      ],
+    },
+    }
+     
+  ])
+  if(!productsResult.length){
+    throw new ApiError(404,"Products not found!")
+  }
+  const products = productsResult[0]?.data || [];
+  const totalProducts = productsResult[0]?.total[0]?.count || 0;
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        products,
+        meta: {
+          page: Number(page),
+          limit: Number(limit),
+          total:totalProducts,
+          totalPages: Math.ceil(totalProducts / Number(limit)),
+        },
+      },
+      "Products fetched successfully"
+    )
+  );
+});
+
+const getDistributorProductById = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { productId } = req.params;
+
+  if (!user) {
+    throw new ApiError(401, "Unauthorized user! Please login");
+  }
+
+  if (user.role.toLowerCase() === "retailer") {
     throw new ApiError(403, "Access denied - not allowed for retailer!");
   }
-  
-  // SARI FIELDS with full details
+
+  if (!mongoose.isValidObjectId(productId)) {
+    throw new ApiError(400, "Invalid product ID");
+  }
+
+  // Fetch product (ownership check included)
   const product = await Product.findOne({
     _id: productId,
-    createdBy: isLoggedUser._id
+    createdBy: user._id,
   })
-    .populate('brand', 'name logo')
-    .populate('category', 'name')
-    .populate('createdBy', 'name email');
-  
+    .populate("category", "name")
+    .populate("createdBy", "name email");
+
   if (!product) {
     throw new ApiError(404, "Product not found!");
   }
-  
+
+  // Fetch inventory (SAFE)
+  const inventory = await Inventory.findOne({
+    productId: product._id,
+    distributorId: user._id,
+  }).select("quantity");
+
+  const stock = inventory?.quantity || 0; 
+
   return res.status(200).json(
-    new ApiResponse(200, { product })
+    new ApiResponse(
+      200,
+      {
+        product,
+        stock,
+      },
+      "Product fetched successfully"
+    )
   );
 });
-//Order managenents--
-const getDistributorOrders=asyncHandler(async(req,res)=>{
-    const isLoggedUser=req.user;
-    if(!isLoggedUser){
-      throw new ApiError(401,"Unauthorized user!please login")
-    }
-    const {
-      page=1,
-      limit=10,
-      status,
-      startDate,
-      endDate,
-      search,
-    }=req.body;
-    const skip=(Number(page)-1)*Number(limit);
-    if(isLoggedUser.role.toLowerCase()!=="distributor"){
-      throw new ApiError(403,"Access-denied only for distributor!")
-    }
-    const filter={distributorId:isLoggedUser._id}
-    if(startDate||endDate){
-      filter.createdAt={};
-      if(startDate){
-        filter.createdAt.$gte=new Date(startDate)
-      }
-      if(endDate){
-        filter.createdAt.$lte=new Date(endDate)
-      }
-    }
-    if(status){
-      filter.status=status.toLowerCase();
-    }
-    if(search){
-     const matchingUsers=await User.find({
-      role:"retailer",
-      $or:[
-        {
-          name:{$regex:search,options:"i"}
-        },
-        {
-          email:{$regex:search,options:"i"}
-        },
-        {
-          phone:{$regex:search,options:"i"}
-        }
-      ]
-     }).select("_id")
-     const userIds=matchingUsers.map(u=>u._id)
-     filter.$or=[
-      {
-        orderNumber:{$regex:search,options:"i"}
-      },
-      {userId:{$in:userIds}}
-     ]
-    }
 
-const total=await Order.countDocuments(filter)
-if(!total){
-  throw new ApiError(404,"Order not found!")
-}
-const orders=await Order.find(filter).select(  'orderNumber ' +
-      'userId ' +
-      'products ' +
-      'totalAmount ' +
-      'status ' +
-      'paymentStatus ' +
-      'paymentMethod ' +
-      'shippingAddress ' +
-      'orderNotes ' +
-      'trackingNumber ' +
-      'createdAt ' +
-      'deliveredAt').populate("userId","name email phone address").
-      populate("products.productId","name thumbnail sku wholesalePrice").
-      sort({createdAt:-1}).skip(skip).limit(Number(limit))
-  const stats=  await Order.aggregate([
-      {
-        $match:{
-          distributorId:isLoggedUser._id
-        }
+//Order managenents--
+const getDistributorOrders = asyncHandler(async (req, res) => {
+  const isLoggedUser = req.user;
+
+  if (!isLoggedUser) {
+    throw new ApiError(401, "Unauthorized user! Please login");
+  }
+
+  if (isLoggedUser.role.toLowerCase() !== "distributor") {
+    throw new ApiError(403, "Access-denied only for distributor!");
+  }
+
+
+  const {
+    page = 1,
+    limit = 10,
+    status,
+    startDate,
+    endDate,
+    search,
+  } = req.query;
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const filter = { distributorId: isLoggedUser._id };
+
+  // DATE RANGE FILTER
+  if (startDate || endDate) {
+    filter.createdAt = {};
+    if (startDate) filter.createdAt.$gte = new Date(startDate);
+    if (endDate) filter.createdAt.$lte = new Date(endDate);
+  }
+
+  // STATUS FILTER
+  if (status) {
+    filter.status = status.toLowerCase();
+  }
+
+  // SEARCH (orderNumber + retailer name/email/phone)
+  if (search) {
+    const matchingUsers = await User.find({
+      role: "retailer",
+      $or: [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+      ],
+    }).select("_id");
+
+    const userIds = matchingUsers.map((u) => u._id);
+
+    filter.$or = [
+      { orderNumber: { $regex: search, $options: "i" } },
+      { userId: { $in: userIds } },
+    ];
+  }
+
+  // COUNT
+  const total = await Order.countDocuments(filter);
+
+  if (!total) {
+    return res.status(200).json(
+      new ApiResponse(200, {
+        currentPage: 1,
+        totalPages: 0,
+        totalOrders: 0,
+        orders: [],
+        stats: [],
+      }, "No orders found")
+    );
+  }
+
+  // DATA
+  const orders = await Order.find(filter)
+    .select(
+      "orderNumber userId products totalAmount status paymentStatus paymentMethod shippingAddress orderNotes trackingNumber createdAt deliveredAt"
+    )
+    .populate("userId", "name email phone")
+    .populate("products.productId", "name thumbnail sku wholesalePrice")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(Number(limit));
+
+  // STATS
+  const stats = await Order.aggregate([
+    { $match: { distributorId: isLoggedUser._id } },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+        totalRevenue: { $sum: "$totalAmount" },
       },
+    },
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
       {
-        $group:{
-          _id:"$status",
-          count:{$sum:1},
-          totalRevenue:{$sum:'$totalAmount'}
-        }
-      }
-    ])
-     return res.status(200).json(
-    new ApiResponse(200, {
-      currentPage: Number(page),
-      totalPages: Math.ceil(total / Number(limit)),
-      totalOrders: total,
-      orders,
-      stats,
-    }, "Orders fetched successfully")
+        currentPage: Number(page),
+        totalPages: Math.ceil(total / Number(limit)),
+        totalOrders: total,
+        orders,
+        stats,
+      },
+      "Orders fetched successfully"
+    )
   );
-})
+});
+
 const getDistributorOrderById=asyncHandler(async(req,res)=>{
 const isLoggedUser=req.user;
  if(!isLoggedUser){
@@ -422,8 +561,9 @@ const getOrdersByStatus=-asyncHandler(async(req,res)=>{
 })
 //Retailer Management
 const getDistributorsRetailers = asyncHandler(async (req, res) => {
+  console.log("congtroller");
   const isLoggedUser = req.user;
-  const { page=1, limit = 10, search='' } = req.body;
+  const { page=1, limit = 10, search='' } = req.query;
   const skip = (Number(page) - 1) * Number(limit);
   // 1. Authentication
   if (!isLoggedUser) {
@@ -575,9 +715,53 @@ const approveRetailer = asyncHandler(async (req, res) => {
 // const getRetailerOrders=as(async(req,res)=>{
 
 // })
+const addRetailer = asyncHandler(async (req, res) => {
+  const distributor = req.user;
+
+  if (!distributor) {
+    throw new ApiError(401, "Unauthorized user!");
+  }
+
+  if (distributor.role !== "distributor") {
+    throw new ApiError(403, "Only distributors can add retailers!");
+  }
+
+  const { name, email, phone, gender, city, pincode } = req.body;
+
+  // Validate fields
+  if ([name, email, phone, gender, city, pincode].some(f => !f?.trim())) {
+    throw new ApiError(400, "All fields are required!");
+  }
+
+  // Check email exists
+  const exists = await User.findOne({ email: email.trim().toLowerCase() });
+  if (exists) {
+    throw new ApiError(409, "Retailer already registered!");
+  }
+
+  // Create retailer
+  const retailer = await User.create({
+    name: name.trim(),
+    email: email.trim().toLowerCase(),
+    password: "Retailer@123",  // default password OR generate random
+    phone,
+    gender: gender.toLowerCase(),
+    role: "retailer",
+    distributorId: distributor._id,
+    address: {
+      city: city.trim().toLowerCase(),
+      pincode: Number(pincode)
+    },
+    isVerified: true
+  });
+
+  return res.status(201).json(
+    new ApiResponse(201, retailer, "Retailer added successfully!")
+  );
+});
 
 //Profiles
-const getDistributorProfile=asyncHandler(async(req,res)=>{
+const getCompanyProfile=asyncHandler(async(req,res)=>{
 const isLoggedUser=req.user;
 if(!isLoggedUser){
   throw new ApiError(401,"Unauthorized user!please login")
@@ -793,104 +977,119 @@ const getNotification=asyncHandler(async(req,res)=>{
 //       })
 //     );
 // })
+/* ================= HELPERS ================= */
 
-const getInventoryReports=asyncHandler(async(req,res)=>{
-   const isLoggedUser = req.user;
-  const { page = 1, limit = 10, search = "" } = req.body;
-  const pageNumber = Number(page);
-  const skip = (pageNumber - 1) * Number(limit);
-
-  // Authorization checks
-  if (!isLoggedUser) {
-    throw new ApiError(401, "Unauthorized user! Please login");
-  }
-
-  if (isLoggedUser.role.toLowerCase() !== "distributor") {
-    throw new ApiError(403, "Access denied - only allowed for distributors!");
-  }
- const distributorId=isLoggedUser._id
-  // Base filter for distributor
-  const filter = { distributorId:distributorId };
-  if(search){
-    const productIds=await getProductIdsForSearch(search,distributorId);
-    if(productIds.length){
-      filter.productId={$in:productIds}
-    }else{
-      res.status(200).json(new ApiResponse(200,{ total: 0,
-          lowStockProducts: [],
-          categorySummary: [],
-          inventoryList: [],}))
-    }
-  }
-  const [total,lowStockProducts,categorySummary,inventoryList]=
-  await Promise.all([
-     Inventory.countDocuments(filter),
-     getLowStockProductsByCategory(distributorId),
-     getCategorySummary(distributorId),
-     Inventory.find(filter).populate("productId","name price stock brand category").
-     sort({createdAt:-1}).skip(skip).limit(limit)
-  ])
-
-
-   return res.status(200).json(
-    new ApiResponse(200, {
-      total,
-      page: pageNumber,
-      limit: Number(limit),
-      totalPages: Math.ceil(total / Number(limit)),
-      lowStockProducts,
-      categorySummary,
-      inventoryList,
-    },"Inventory fetched successfully")
-  );
-
-
-  async function getProductIdsForSearch(search,distributorId){
-    const products=await Product.find({$or:[
-      {
-        name:{$regex:search,$options:"i"},
-      },
-      {
-        brand:{$regex:search,$options:"i"}
-      }
+async function getProductIdsForSearch(search, distributorId) {
+  const products = await Product.find({
+    createdBy: distributorId,
+    $or: [
+      { name: { $regex: search, $options: "i" } },
+      { brand: { $regex: search, $options: "i" } },
     ],
-    createdBy:distributorId
-  }).select("_id")
-    const productIds=products.map(p=>p._id)
-    const categories=await Category.find({name:{$regex:search,$options:"i"}}).select("_id");
-     const categoryIds=categories.map(c=>c._id);
-     if(categoryIds.length>0){
-      const categoryProducts=await Product.find({category:{$in:categoryIds},createdBy:distributorId}).select("_id")
-       const cpIds=categoryProducts.map((cp)=>cp._id);
-       productIds=[...new Set([...productIds,...cpIds])]
-     }
-     return productIds;
+  }).select("_id");
+
+  let productIds = products.map(p => p._id);
+
+  const categories = await Category.find({
+    name: { $regex: search, $options: "i" },
+  }).select("_id");
+
+  if (categories.length > 0) {
+    const categoryProducts = await Product.find({
+      category: { $in: categories.map(c => c._id) },
+      createdBy: distributorId,
+    }).select("_id");
+
+    productIds = [...new Set([
+      ...productIds,
+      ...categoryProducts.map(p => p._id),
+    ])];
   }
-  async function getLowStockProductsByCategory(distributorId){
-    return await Inventory.aggregate([
+
+  return productIds;
+}
+
+async function getLowStockProductsByCategory(distributorId) {
+  // return Inventory.aggregate([
+  //   {
+  //     $match: {
+  //       distributorId,
+  //       quantity: { $lte: 10 },
+  //     },
+  //   },
+
+  //   // join product
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "productId",
+  //       foreignField: "_id",
+  //       as: "product",
+  //     },
+  //   },
+  //   { $unwind: "$product" },
+
+  //   // join category
+  //   {
+  //     $lookup: {
+  //       from: "categories",
+  //       localField: "product.category",
+  //       foreignField: "_id",
+  //       as: "category",
+  //     },
+  //   },
+  //   { $unwind: "$category" },
+
+  //   // 🔑 explicitly define fields
+  //   {
+  //     $addFields: {
+  //       categoryId: "$category._id",
+  //       categoryName: "$category.name", 
+  //     },
+  //   },
+
+  //   // group by category
+  //   {
+  //     $group: {
+  //       _id: "$categoryId",
+  //       categoryName: { $first: "$categoryName" },
+  //       products: {
+  //         $push: {
+  //           productId:"$product._id",
+  //           productName: "$product.name",
+  //           brand: "$product.brand",
+  //           stock: "$quantity",
+  //         },
+  //       },
+  //     },
+  //   },
+
+  //   // final shape
+  //   {
+  //     $project: {
+  //       _id: 0,
+  //       categoryId: "$_id",
+  //       categoryName: 1,
+  //       totalLowStockProducts: { $size: "$products" },
+  //       products: 1,
+  //     },
+  //   },
+
+  //   { $sort: { totalLowStockProducts: -1 } },
+  // ]);
+    return  Inventory.aggregate([
       {
         $match:{
-          distributorId:distributorId,
+          distributorId,
           quantity:{$lte:10}
-        }
-      },
-      {
-        $group:{
-          _id:"$productId",
-          totalStock:{$sum:"$quantity"}
-        }
-      },
-      {
-        $match:{
-          totalStock:{$lte:10}
         }
       },
       {
         $lookup:{
           from:"products",
-          localField:"_id",
+          localField:"productId",
           foreignField:"_id",
-          as:"product",
+          as:"product"
         }
       },
       {
@@ -909,86 +1108,207 @@ const getInventoryReports=asyncHandler(async(req,res)=>{
       },
       {
         $group:{
-          _id:"$product.category",
-          catName:{$first:"$category.name"},
-          totalLowStockProducts:{$addToSet:"$_id"},
-          lowStockProducts:{
-            $push:{
-              productId:"$_id",
-              productName:"$product.name",
-              totalStock:"$totalStock",
-              brand:"$product.brand",
-            }
+          _id:"$category._id",
+          categoryName:{$first:"$category.name"},
+         products:{
+          $push:{
+            productName:"$product.name",
+            quantity:"$quantity",
           }
+         },
+         totalLowProducts:{
+          $sum:1,
+         }
         }
       },
+      
       {
         $project:{
           _id:0,
+          categoryName:1,
           categoryId:"$_id",
-          catName:1,
-          totalLowStockProducts:{$size:"$totalLowStockProducts"},
-          lowStockProducts:1
+          products:1,
+          totalLowProducts:1,
+          total:1
         }
       },
       {
-        $sort:{totalLowStockProducts:-1}
+        $sort:{totalLowProducts:-1}
       }
-    ])
-  }
-  async function getCategorySummary(distributorId) {
-         await Inventory.aggregate([
-          {
-            $match:{
-              distributorId:distributorId
-            }
-          },
-          {
-            $lookup:{
-              from:"products",
-              localField:"productId",
-              foreignField:"_id",
-              as:"product"
-            }
-          },
-          {
-            $unwind:"$product"
-          },
-          {
-            $lookup:{
-              from:"categories",
-              localField:"product.category",
-              foreignField:"_id",
-              as:"category"
-            }
-          },
-          {
-            $unwind:"$category"
-          },
-          {
-            $group:{
-              _id:"$category._id",
-              categoryName:{$first:"$category.name"},
-              products:{$addToSet:"$product._id"},
-              totalStock:{$sum:"$quantity"}
-            }
-          },
-          {
-            $project:{
-              _id:0,
-              categoryId:"$_id",
-              categoryName:1,
-              totalProducts:{$size:"$products"},
-              totalStock:1,
 
-            }
-          },
-          {
-       $sort:{totalStock:-1},
+    ])
+}
+
+
+async function getCategorySummary(distributorId) {
+  // return Inventory.aggregate([
+  //   { $match: { distributorId } },
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "productId",
+  //       foreignField: "_id",
+  //       as: "product",
+  //     },
+  //   },
+  //   { $unwind: "$product" },
+  //   {
+  //     $lookup: {
+  //       from: "categories",
+  //       localField: "product.category",
+  //       foreignField: "_id",
+  //       as: "category",
+  //     },
+  //   },
+  //   { $unwind: "$category" },
+  //   {
+  //     $group: {
+  //       _id: "$category._id",
+  //       categoryName: { $first: "$category.name" },
+  //       totalProducts: { $addToSet: "$product._id" },
+  //       totalStock: { $sum: "$quantity" },
+  //     },
+  //   },
+  //   {
+  //     $project: {
+  //       _id: 0,
+  //       categoryId: "$_id",
+  //       categoryName: 1,
+  //       totalProducts: { $size: "$totalProducts" },
+  //       totalStock: 1,
+  //     },
+  //   },
+  //   { $sort: { totalStock: -1 } },
+  // ]);
+  return Inventory.aggregate([
+    {
+      $match:{
+        distributorId,
+      }
+    },
+    {
+       $lookup:{
+        from :"products",
+        localField:"productId",
+        foreignField:"_id",
+        as:"product"
+       }
+    },
+    {
+      $unwind:"$product",
+    },
+    {
+      $lookup:{
+        from:"categories",
+        localField:"product.category",
+        foreignField:"_id",
+        as:"category"
+      }
+    },
+    {
+      $unwind:"$category"
+    },
+    {
+      $group:{
+        _id:"$category._id",
+        categoryName:{$first:"$category.name"},
+        totalStockItems:{
+          $sum:1,
+        },
+        lowStockItems:{
+          $sum:{
+            $cond:[{$lte:["$quantity",10]},1,0],
           }
-         ]) 
+        },
+        inStockItems:{
+          $sum:{
+            $cond:[{$gt:["$quantity",10]},1,0]
+          }
+        }
+      }
+    },
+    {
+      $project:{
+        _id:0,
+        categoryId:"$_id",
+        categoryName:1,
+        totalStockItems:1,
+        lowStockItems:1,
+        inStockItems:1
+      }
+    },
+    {
+      $sort:{lowStockItems:-1},
+    }
+  ])
+  
+}
+async function getInventoryList(distributorId){
+  return Inventory
+}
+
+
+const getDashboardReports = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { page = 1, limit = 10, search = "" } = req.query;
+
+  if (!user) throw new ApiError(401, "Unauthorized");
+  if (user.role.toLowerCase() !== "distributor") {
+    throw new ApiError(403, "Only distributors allowed");
   }
-})
+
+  const distributorId = user._id;
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const filter = { distributorId };
+
+  // if (search) {
+  //   const productIds = await getProductIdsForSearch(search, distributorId);
+  //   if (productIds.length > 0) {
+  //     filter.productId = { $in: productIds };
+  //   } else {
+  //     return res.status(200).json(
+  //       new ApiResponse(200, {
+  //         total: 0,
+  //         lowStockProducts: [],
+  //         categorySummary: [],
+  //         inventoryList: [],
+  //       }, "No inventory found")
+  //     );
+  //   }
+  // }
+
+  const [
+    totalProducts,
+    lowCategoryProducts,
+    categorySummary,
+    inventoryList,
+  ] = await Promise.all([
+    Inventory.countDocuments(filter),
+    getLowStockProductsByCategory(distributorId),
+    getCategorySummary(distributorId),
+    Inventory.find(filter)
+      .populate("productId", "name price brand category")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit)),
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      totalProducts,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(totalProducts / Number(limit)),
+      lowCategoryProducts,
+      categorySummary,
+      inventoryList,
+    }, "Inventory report fetched successfully")
+  );
+});
+
+
+
 
 const updateWholesalePricing=asyncHandler(async(req,res)=>{
 const user=req.user;
@@ -1159,4 +1479,221 @@ const uploadDistributorDocs = asyncHandler(async (req, res) => {
 });
 
 
-export {updateDistributor,approveRetailer,getAllApprovedDistributors,uploadDistributorDocs,getDistributorProducts,getDistributorProductById,getDistributorOrders,getDistributorOrderById,OrderStatusChange,getDistributorsRetailers,getRetailerById,getDistributorProfile,getInventoryReports,updateWholesalePricing,exportsProductsToExcel}
+/**
+ * UPLOAD DOCUMENTS (Multiple)
+ */
+ const uploadDistributorDocuments = asyncHandler(async (req, res) => {
+  const user = req.user;
+  if (!user) throw new ApiError(401, "Unauthorized user!");
+
+  const files = req.files; // Expecting multiple
+  if (!files || files.length === 0) {
+    throw new ApiError(400, "At least one document file is required!");
+  }
+
+  const distributor = await DistributorProfile.findOne({ userId: user._id });
+  if (!distributor) throw new ApiError(404, "Distributor profile not found!");
+
+  const uploadedDocs = [];
+
+  for (const file of files) {
+    const uploaded = await uploadFileOnCloud(file.path);
+    if (!uploaded) {
+      throw new ApiError(500, "File upload failed!");
+    }
+
+    uploadedDocs.push({
+      docType: file.mimetype,
+      docUrl: uploaded,
+      verified: false,
+    });
+  }
+
+  distributor.documents.push(...uploadedDocs);
+  await distributor.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { documents: distributor.documents },
+      "Documents uploaded successfully"
+    )
+  );
+});
+
+/**
+ * DELETE DOCUMENT
+ */
+ const deleteDistributorDocument = asyncHandler(async (req, res) => {
+  const user = req.user;
+  if (!user) throw new ApiError(401, "Unauthorized user!");
+
+  const { docId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(docId)) {
+    throw new ApiError(400, "Invalid document ID!");
+  }
+
+  const distributor = await DistributorProfile.findOne({ userId: user._id });
+  if (!distributor) throw new ApiError(404, "Distributor not found!");
+
+  const doc = distributor.documents.id(docId);
+  if (!doc) {
+    throw new ApiError(404, "Document not found!");
+  }
+
+  // Delete file from cloud
+  await deleteFileOnCloud(doc.docUrl);
+
+  // Remove document from array
+  doc.deleteOne();
+  await distributor.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { documents: distributor.documents },
+      "Document deleted successfully"
+    )
+  );
+});
+
+/**
+ * VERIFY DOCUMENT (Admin Only)
+ */
+const verifyDistributorDocument = asyncHandler(async (req, res) => {
+  const user = req.user;
+
+  if (user.role !== "admin") {
+    throw new ApiError(403, "Only admin can verify documents!");
+  }
+
+  const { docId } = req.params;
+  const { distributorId } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(docId) || !distributorId) {
+    throw new ApiError(400, "Invalid input!");
+  }
+
+  const distributor = await DistributorProfile.findOne({ userId: distributorId });
+  if (!distributor) throw new ApiError(404, "Distributor not found!");
+
+  const doc = distributor.documents.id(docId);
+  if (!doc) throw new ApiError(404, "Document not found!");
+
+  doc.verified = true;
+  doc.verifiedBy = user._id;
+  doc.verifiedAt = new Date();
+
+  await distributor.save();
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      doc,
+      "Document verified successfully"
+    )
+  );
+});
+const getTopRetailers = asyncHandler(async (req, res) => {
+  const distributorId = req.user._id;
+
+  if (!distributorId) {
+    throw new ApiError(401, "Unauthorized user! Please login");
+  }
+
+  // Distributor check
+  if (req.user.role.toLowerCase() !== "distributor") {
+    throw new ApiError(403, "Access denied! Only distributors allowed.");
+  }
+
+  const retailers = await Order.aggregate([
+    {
+      $match: { distributorId: distributorId }
+    },
+    {
+      $group: {
+        _id: "$userId",
+        totalOrders: { $sum: 1 },
+        totalRevenue: { $sum: "$totalAmount" }
+      }
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "_id",
+        foreignField: "_id",
+        as: "retailer"
+      }
+    },
+    {
+      $unwind: "$retailer"
+    },
+    {
+      $project: {
+        _id: 0,
+        retailerId: "$retailer._id",
+        name: "$retailer.name",
+        email: "$retailer.email",
+        totalOrders: 1,
+        revenue: "$totalRevenue"
+      }
+    },
+    {
+      $sort: { revenue: -1 }  // Highest revenue first
+    },
+    {
+      $limit: 10  // Top 10 retailers
+    }
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      retailers,
+      "Top retailers fetched successfully"
+    )
+  );
+});
+
+const getBusinessProfile=asyncHandler(async(req,res)=>{
+const user=req.user;
+if(!user||user.role==="retailer"){
+  throw new ApiError(401,"Access denied!only distributor allowed")
+}
+await DistributorProfile.aggregate([
+  {
+    $match:{
+      userId:user._id
+    }
+  },
+  {
+    $lookup:{
+      from:"users",
+      localField:"userId",
+      foreignField:"_id",
+      as:"user",
+    }
+  },
+  {
+    $unwind:"$user"
+  },
+  {
+    $project:{
+      ownerName:"$user.name",
+      ownerPhone:"$user.phone",
+      ownerEmail:"$user.email",
+      shopName:"$businessName",
+      userId:"$userId",
+      businessType:"$businessType",
+      status:"$status",
+      gstNumber:"$gstNumber"
+    }
+  }
+])
+})
+export {updateDistributor,getBusinessProfile,approveRetailer,getAllApprovedDistributors,
+  getDistributorProducts,getDistributorProductById,getDistributorOrders
+  
+  ,getDistributorOrderById,OrderStatusChange,getDistributorsRetailers,getRetailerById,getCompanyProfile,getDashboardReports,updateWholesalePricing,
+  exportsProductsToExcel,uploadDistributorDocs,deleteDistributorDocument,verifyDistributorDocument,
+getTopRetailers,addRetailer}

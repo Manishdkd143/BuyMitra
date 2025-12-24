@@ -4,7 +4,8 @@ import {
   updateInventory,
   deleteInventory,
   getInventory,
-  getInventoryById
+  getInventoryById,
+  lowStockProducts
 } from "../controllers/inventory.controller.js";
 
 import { isAdminOrDistributor } from "../middleware/role.middleware.js";
@@ -19,12 +20,12 @@ router.use(verifyJWT,isAdminOrDistributor);
 router.route("/")
   .get(getInventory)       // /api/inventory?page=1&limit=10&search=phone
   .post(addInventory);     // /api/inventory   (add inventory)
-
+  
+  router.get("/low-stock", lowStockProducts); 
 // SINGLE INVENTORY CRUD
 router.route("/:id")
   .get(getInventoryById)   // /api/inventory/6767aghfj   (get by id)
   .put(updateInventory)    // update
   .delete(deleteInventory) // delete
 ;
-
 export default router;

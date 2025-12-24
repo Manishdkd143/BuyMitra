@@ -6,8 +6,11 @@ import uploadFileOnCloud from "../utils/Cloudinary.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import deleteFileOnCloud from "../utils/deleteFileOnCloud.js";
 import SHA256 from "crypto-js/sha256.js";
+import crypto from "crypto"
 import fs from "fs"
 import { DistributorProfile } from "../models/distributorProfile.model.js";
+import { sendEmail } from "../utils/mail.js";
+import { log } from "console";
 
 const generatedAccessAndRefreshToken=async(userId)=>{
   try {
@@ -22,10 +25,10 @@ const generatedAccessAndRefreshToken=async(userId)=>{
   }
 }
 const userRegister = asyncHandler(async (req, res) => {
-  const { name, email, password, phone, gender, role, distributorId,city } = req.body;
+  const { name, email, password, phone, gender, role, distributorId,city,pincode } = req.body;
 
   // Validate
-  if ([name, email, password, phone, gender, role,city].some(field=>!field)) {
+  if ([name, email, password, phone, gender, role,city,pincode].some(field=>!field)) {
     if (req.file?.path) fs.unlinkSync(req.file.path);
     throw new ApiError(401, "All fields are required!");
   }
@@ -53,7 +56,7 @@ const userRegister = asyncHandler(async (req, res) => {
     gender: gender.toLowerCase(),
     profilePic: uploadedPic?.url || null,
     role,
-    address:{city:city.trim().toLowerCase()},
+    address:{city:city.trim().toLowerCase(),pincode:Number(pincode)||null},
     distributorId: role === "retailer" ? distributorId : null,
     isVerified: role === "distributor" ? false : true, // Distributors must be verified
   });
@@ -83,7 +86,7 @@ const userLogin = asyncHandler(async (req, res) => {
     if (!user) throw new ApiError(404, "User not found!");
 
     // Admin cannot use this route
-    if (user.role === "admin") throw new ApiError(403, "Admins must use admin login route!");
+    
 
     const isValidPassword = await user.isPasswordCorrect(password);
     if (!isValidPassword) throw new ApiError(402, "Invalid credentials!");
@@ -292,53 +295,119 @@ const deleteProfilePic = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, {}, "Profile picture deleted successfully"));
 });
-const forgotPassword=asyncHandler(async(req,res)=>{
-  const {email}=req.body;
-  if(email){
-    throw new ApiError(400,"Email is required!")
-  }
-  const user=await User.findOne({email}).select("-password");
-  if(!user){
-    res.status(200).json(new ApiResponse(200,{},"If this email is registered, a reset link has been sent."))
-  }
-  const token=crypto.randomBytes(32).toString("hex");
-  console.log("Token:",token);
-  if(!token){
-    throw new ApiError(500,"Something error")
-  }
-  const hashedToken=SHA256(token);
-  if(!hashedToken){
-    throw new ApiError(500,"Something system error")
-  }
-  user.resetPasswordToken=hashedToken;
-  user.resetPasswordExpire=new Date.now()*60*1000;
-  await user.save({validateBeforeSave:false})
-  return res.status(200).json(new ApiResponse(200,user,"If this email is registered,a reset link has been sent."))
-})
-const resetPassword=asyncHandler(async(req,res)=>{
-  const {token}=req.params.token;
-  const {newPassword,confirmPassword}=req.body;
-  if(!token){
-    throw new ApiError(404,"reset link is not generated!")
-  }
-  if(!newPassword||!confirmPassword){
-    throw new ApiError(404,"password fields is required!")
-  }
-  if(newPassword.length<6&&confirmPassword.length<6){
-    throw new ApiError(400,"password length is minimum!")
-  }
-  const hashedPass=SHA256(token)
-  const user=await User.findOne({resetPasswordToken:hashedPass,resetPasswordExpire:{$gt:Date.now()}})
-  if(!user){
-    throw new ApiError(400,"Reset link is invalid or has expired. Please request a new one.")
-  }
-  user.password=newPassword;
-  user.resetPasswordToken=undefined;
-  user.resetPasswordExpire=undefined;
-  user.lastPasswordChangeAt=new Date.now()
-  await user.save({validateBeforeSave:true})
-  return res.status(200).json(new ApiResponse(200,{},"Password updated successfully"))
-})
+// const forgotPassword=asyncHandler(async(req,res)=>{
+//   const {email}=req.body;
+//   if(email){
+//     throw new ApiError(400,"Email is required!")
+//   }
+//   const user=await User.findOne({email}).select("-password");
+//   if(!user){
+//     res.status(200).json(new ApiResponse(200,{},"If this email is registered, a reset link has been sent."))
+//   }
+//   const token=crypto.randomBytes(32).toString("hex");
+//   console.log("Token:",token);
+//   if(!token){
+//     throw new ApiError(500,"Something error")
+//   }
+//   const hashedToken=SHA256(token);
+//   if(!hashedToken){
+//     throw new ApiError(500,"Something system error")
+//   }
+//   user.resetPasswordToken=hashedToken;
+//   user.resetPasswordExpire=new Date.now()*60*1000;
+//   await user.save({validateBeforeSave:false})
+//   return res.status(200).json(new ApiResponse(200,user,"If this email is registered,a reset link has been sent."))
+// })
+ const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  console.log(req.body);
+  
+  if (!email) throw new ApiError(400, "Email is required");
+
+  const user = await User.findOne({ email });
+  if (!user) throw new ApiError(404, "User not found");
+
+  // const token = crypto.randomBytes(32).toString("hex");
+  const token =crypto.randomBytes(32).toString("hex")
+  const hashedToken = SHA256(token).toString();
+
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+  await user.save({ validateBeforeSave: false });
+
+  const resetURL = `${process.env.FRONTEND_URL}/auth/resetpassword/${token}`;
+
+  const message = `
+    <h2>Reset Your Password</h2>
+    <p>Click the link below to reset your password. Link is valid for 10 minutes.</p>
+    <a href="${resetURL}">${resetURL}</a>
+  `;
+
+  await sendEmail(user.email, "Password Reset Request", message);
+
+  res.status(200).json({ status: "success", message: "Reset link sent to email" });
+});
+// const resetPassword = asyncHandler(async (req, res) => {
+//   const { token } = req.params; // correct destructuring
+//   const { newPassword, confirmPassword } = req.body;
+
+//   if (!token) {
+//     throw new ApiError(404, "Reset link is not generated!");
+//   }
+//   if (!newPassword || !confirmPassword) {
+//     throw new ApiError(404, "Password fields are required!");
+//   }
+//   if (newPassword.length < 6 || confirmPassword.length < 6) {
+//     throw new ApiError(400, "Password length must be at least 6 characters!");
+//   }
+
+//   const hashedPass = SHA256(token); // make sure you store hashed token in DB
+//   const user = await User.findOne({
+//     resetPasswordToken: hashedPass,
+//     resetPasswordExpire: { $gt: Date.now() },
+//   });
+
+//   if (!user) {
+//     throw new ApiError(400, "Reset link is invalid or has expired. Please request a new one.");
+//   }
+
+//   user.password = newPassword; // if pre-save hook hashes password, this is fine
+//   user.resetPasswordToken = undefined;
+//   user.resetPasswordExpire = undefined;
+//   user.lastPasswordChangeAt = Date.now(); // fix
+
+//   await user.save({ validateBeforeSave: true });
+
+//   return res
+//     .status(200)
+//     .json(new ApiResponse(200, {}, "Password updated successfully"));
+// });
+const resetPassword = asyncHandler(async (req, res) => {
+ const { token } = req.params;
+const { newPassword, confirmPassword } = req.body;
+
+  if (!token) throw new ApiError(400, "Reset token is required");
+  if (!newPassword || !confirmPassword) throw new ApiError(400, "Password fields are required");
+  if (newPassword !== confirmPassword) throw new ApiError(400, "Passwords do not match");
+
+  const hashedToken = SHA256(token).toString();
+
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpire: { $gt: Date.now() },
+  });
+
+  if (!user) throw new ApiError(400, "Reset link is invalid or expired");
+
+  user.password = newPassword;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+  user.lastPasswordChangeAt = Date.now();
+
+  await user.save({ validateBeforeSave: true });
+
+  res.status(200).json({ status: "success", message: "Password updated successfully" });
+});
 const applyForDistributor=asyncHandler(async(req,res)=>{
   const isLoggedUser=req.user;
   if(!isLoggedUser){
@@ -396,5 +465,25 @@ const applyForDistributor=asyncHandler(async(req,res)=>{
         new ApiResponse(201, application, "Application submitted successfully! Admin will review soon.")
     );
 })
+const getAllApprovedDistributors = asyncHandler(async (req, res) => {
+    const { search = "" } = req.query; // search query from frontend
 
-export {userRegister,userLogin,userLogout,getCurrentUser,updatePassword,updateProfilePic,updateUserdetails,refreshAccessToken,removeAccount,deleteProfilePic,forgotPassword,resetPassword,applyForDistributor,generatedAccessAndRefreshToken}
+    // Build filter
+    const filter = {
+        status: "approved",
+        $or: [
+            { businessName: { $regex: search, $options: "i" } },
+            { "businessAddress.city": { $regex: search, $options: "i" } },
+            { "businessAddress.state": { $regex: search, $options: "i" } }
+        ]
+    };
+
+    const distributors = await DistributorProfile.find(filter)
+        .select("businessName userId")
+        .populate("userId", "name email phone")
+        .sort({ createdAt: -1 });
+
+    return res.status(200).json(new ApiResponse(200, distributors, "Approved distributors fetched successfully"));
+});
+
+export {userRegister,userLogin,userLogout,getAllApprovedDistributors,getCurrentUser,updatePassword,updateProfilePic,updateUserdetails,refreshAccessToken,removeAccount,deleteProfilePic,forgotPassword,resetPassword,applyForDistributor,generatedAccessAndRefreshToken}

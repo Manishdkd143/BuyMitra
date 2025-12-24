@@ -5,121 +5,127 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Product } from "../models/product.model.js";
 
-const addInventory=asyncHandler(async(req,res)=>{
-    const isLoggedUser=req.user;
-    if(!isLoggedUser){
-        throw new ApiError(401,"Unauthorized user!please login")
-    }
-    const {productId,qty}=req.body;
-    if(isLoggedUser.role.toLowerCase!=="distributor"){
-        throw new ApiError(403,"Access-denied only distributor allowed!")
-    }
-    if(!productId||!qty){
-        throw new ApiError(400,"product and quantity required!")
-    }
-    if(!mongoose.isValidObjectId(productId)){
-        throw new ApiError(400,"Invalid product id!")
-    }
-   const  existing=await Inventory.findOne({distributorId:isLoggedUser._id,productId
-    })
-    let result;
-    if(existing){
-        existing.quantity+=Number(qty);
-        await existing.save()
-        result=existing
-  return res.status(200).json(new ApiResponse(200,existing,"Inventory updated successfully"))
-    }else{
-      const  result=await Inventory.create({
-             distributorId:isLoggedUser._id,
-             productId,
-             quantity:Number(qty),
-         })
-    }
-    
-  return res.status(200).json(new ApiResponse(200,result,"Inventory created  successfully"))
-})
+/* ================= ADD / INCREASE INVENTORY ================= */
+const addInventory = asyncHandler(async (req, res) => {
+  const user = req.user;
+  if (!user) throw new ApiError(401, "Unauthorized user");
+
+  if (user.role.toLowerCase() !== "distributor") {
+    throw new ApiError(403, "Only distributor can add inventory");
+  }
+
+  const { productId, qty } = req.body;
+
+  if (!productId || qty === undefined) {
+    throw new ApiError(400, "ProductId and quantity are required");
+  }
+
+  if (!mongoose.isValidObjectId(productId)) {
+    throw new ApiError(400, "Invalid product ID");
+  }
+
+  const productExists = await Product.findById(productId);
+  if (!productExists) {
+    throw new ApiError(404, "Product not found");
+  }
+
+  let inventory = await Inventory.findOne({
+    distributorId: user._id,
+    productId,
+  });
+
+  if (inventory) {
+    inventory.quantity += Number(qty);
+    await inventory.save();
+  } else {
+    inventory = await Inventory.create({
+      distributorId: user._id,
+      productId,
+      quantity: Number(qty),
+    });
+  }
+
+  res.status(200).json(
+    new ApiResponse(200, inventory, "Inventory updated successfully")
+  );
+});
+
+/* ================= UPDATE INVENTORY (MANUAL) ================= */
 const updateInventory = asyncHandler(async (req, res) => {
   const user = req.user;
   const { id } = req.params;
   const { quantity } = req.body;
 
-  if (!user) throw new ApiError(401, "Unauthorized user!");
-  if (!id || !mongoose.isValidObjectId(id)) {
+  if (!user) throw new ApiError(401, "Unauthorized user");
+
+  if (!mongoose.isValidObjectId(id)) {
     throw new ApiError(400, "Invalid inventory ID");
   }
 
   const inventory = await Inventory.findById(id);
   if (!inventory) throw new ApiError(404, "Inventory not found");
 
-  // Distributor can update only his inventory
-  if (user.role.toLowerCase() === "distributor" &&
-      inventory.distributorId.toString() !== user._id.toString()) {
+  if (
+    user.role.toLowerCase() === "distributor" &&
+    inventory.distributorId.toString() !== user._id.toString()
+  ) {
     throw new ApiError(403, "Permission denied");
   }
 
-  inventory.quantity = Number(quantity) ?? inventory.quantity;
+  if (quantity !== undefined) {
+    inventory.quantity = Number(quantity);
+  }
+
   await inventory.save();
 
-  res.status(200).json(new ApiResponse(200, inventory, "Inventory updated successfully"));
+  res.status(200).json(
+    new ApiResponse(200, inventory, "Inventory updated successfully")
+  );
 });
-const reduceStock=asyncHandler(async(distributorId,productId,qty)=>{
-    const inventory = await Inventory.findOne({
-    distributorId,
-    productId,
-  });
+
+/* ================= REDUCE STOCK (ORDER TIME) ================= */
+/**
+ * ❗ INTERNAL HELPER
+ * ❗ API nahi hai
+ */
+const reduceStock = async (distributorId, productId, qty) => {
+  const inventory = await Inventory.findOne({ distributorId, productId });
 
   if (!inventory) throw new Error("Inventory not found");
-
   if (inventory.quantity < qty) throw new Error("Insufficient stock");
 
   inventory.quantity -= qty;
   await inventory.save();
 
   return inventory;
-})
+};
+
+/* ================= GET INVENTORY LIST ================= */
 const getInventory = asyncHandler(async (req, res) => {
   const user = req.user;
   const { page = 1, limit = 10, search = "" } = req.query;
 
-  if (!user) {
-    throw new ApiError(401, "Unauthorized user! Please login");
+  if (!user) throw new ApiError(401, "Unauthorized user");
+
+  if (!["admin", "distributor"].includes(user.role.toLowerCase())) {
+    throw new ApiError(403, "Access denied");
   }
 
-  const userRole = user.role?.toLowerCase();
-  if (!["admin", "distributor"].includes(userRole)) {
-    throw new ApiError(403, "Access denied — retailer not allowed");
-  }
-
-  // Base filter
   const filter = {};
 
-  // Distributor can only see his own inventory
-  if (userRole === "distributor") {
+  if (user.role.toLowerCase() === "distributor") {
     filter.distributorId = user._id;
   }
 
-  // Search products by name
-  if (search.trim() !== "") {
+  if (search.trim()) {
     const products = await Product.find({
       name: { $regex: search, $options: "i" },
     }).select("_id");
 
-    const productIds = products.map((p) => p._id);
-
-    if (productIds.length > 0) {
-      filter.productId = { $in: productIds };
-    }
+    filter.productId = { $in: products.map((p) => p._id) };
   }
 
-  // Count total
   const total = await Inventory.countDocuments(filter);
-
-  if (total === 0) {
-    return res
-      .status(200)
-      .json(new ApiResponse(200, { total: 0, inventory: [] }, "Inventory empty!"));
-  }
-
   const skip = (page - 1) * limit;
 
   const inventory = await Inventory.find(filter)
@@ -129,7 +135,7 @@ const getInventory = asyncHandler(async (req, res) => {
     .skip(skip)
     .limit(Number(limit));
 
-  return res.status(200).json(
+  res.status(200).json(
     new ApiResponse(
       200,
       {
@@ -143,17 +149,7 @@ const getInventory = asyncHandler(async (req, res) => {
   );
 });
 
-const deleteInventory = asyncHandler(async (req, res) => {
-    const distributorId = req.user?._id;
-    const { id } = req.params;
-
-    const deleted = await Inventory.findOneAndDelete({ _id: id, distributorId });
-    if (!deleted) throw new ApiError(404, "Inventory item not found!");
-
-    res.status(200).json(
-        new ApiResponse(200, deleted, "Inventory item deleted successfully")
-    );
-});
+/* ================= GET INVENTORY BY ID ================= */
 const getInventoryById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -167,7 +163,63 @@ const getInventoryById = asyncHandler(async (req, res) => {
 
   if (!inventory) throw new ApiError(404, "Inventory not found");
 
-  res.status(200).json(new ApiResponse(200, inventory, "Inventory details fetched"));
+  res.status(200).json(
+    new ApiResponse(200, inventory, "Inventory fetched successfully")
+  );
 });
 
-export {addInventory,updateInventory,deleteInventory,getInventory,getInventoryById}
+/* ================= DELETE INVENTORY ================= */
+const deleteInventory = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new ApiError(400, "Invalid inventory ID");
+  }
+
+  const deleted = await Inventory.findOneAndDelete({
+    _id: id,
+    distributorId: user._id,
+  });
+
+  if (!deleted) throw new ApiError(404, "Inventory not found");
+
+  res.status(200).json(
+    new ApiResponse(200, deleted, "Inventory deleted successfully")
+  );
+});
+const lowStockProducts = asyncHandler(async (req, res) => {
+  const user = req.user;
+  if (!user) throw new ApiError(401, "Unauthorized user");
+  if (user.role.toLowerCase() !== "distributor") {
+    throw new ApiError(403, "Only distributor can access low stock products");
+  }
+  const lowStockThreshold = 10; 
+  const lowStockInventories = await Inventory.find({
+    distributorId: user._id,
+    quantity: { $lt: lowStockThreshold },
+  }).populate("productId", "name price unit category");
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      lowStockInventories,
+      "Low stock products fetched successfully"
+    )
+  );
+});
+
+
+
+
+
+
+
+export {
+  addInventory,
+  updateInventory,
+  getInventory,
+  getInventoryById,
+  deleteInventory,
+  reduceStock,
+  lowStockProducts,
+};

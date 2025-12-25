@@ -190,10 +190,10 @@ const changeUserRole=asyncHandler(async(req,res)=>{
     }
      const currentRole = user.role?.toLowerCase();
    
-    if (!["retailer", "distributor"].includes(currentRole)) {
-        throw new ApiError(400, "Only distributor/retailer roles can be changed!");
+    if (!["customer", "distributor"].includes(currentRole)) {
+        throw new ApiError(400, "Only distributor/customer roles can be changed!");
     }
-        user.role = currentRole === "distributor" ? "retailer" : "distributor";
+        user.role = currentRole === "distributor" ? "customer" : "distributor";
    await user.save()
    return res.status(200).json(new ApiResponse(200,user,"Role updated successfully"))
 })
@@ -230,8 +230,8 @@ return res.status(200).json(new ApiResponse(200,user,"User deleted successfully"
 //     if (!existingUser) {
 //         throw new ApiError(404, "User does not exist!");
 //     }
-//      if (existingUser.role.toLowerCase() === "retailer") {
-//         throw new ApiError(400, "Retailers do not require admin approval!");
+//      if (existingUser.role.toLowerCase() === "customer") {
+//         throw new ApiError(400, "customers do not require admin approval!");
 //     }
 //     if (existingUser?.approvedByAdmin?.isApproval === true) {
 //         throw new ApiError(400, "User already approved!");

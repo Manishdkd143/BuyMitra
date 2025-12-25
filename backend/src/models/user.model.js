@@ -54,8 +54,8 @@ const userSchema = new Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'distributor', 'retailer'],
-        default: 'retailer',
+        enum: ['admin', 'distributor', 'customer'],
+        default: 'customer',
     },
     isVerified: {
         type: Boolean,
@@ -66,10 +66,10 @@ const userSchema = new Schema({
         enum: ['active', 'suspended', 'pending'],
         default: 'active',
     },
-        distributorId: {
+    distributorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, // Only for retailer
+      default: null, // Only for customer
     },
     address: addressSchema,
     profilePic: {

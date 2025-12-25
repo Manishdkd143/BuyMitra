@@ -15,7 +15,7 @@ const addToCart = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
 if(["admin","distributor"].includes(isLoggedUser.role.toLowerCase())){
-  throw new ApiError(401,"Only retailer buying product!")
+  throw new ApiError(401,"Only customer buying product!")
 }
   if (!productId || !isValidObjectId(productId)) {
     throw new ApiError(400, "Invalid or missing product ID");

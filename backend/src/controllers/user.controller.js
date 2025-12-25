@@ -57,7 +57,7 @@ const userRegister = asyncHandler(async (req, res) => {
     profilePic: uploadedPic?.url || null,
     role,
     address:{city:city.trim().toLowerCase(),pincode:Number(pincode)||null},
-    distributorId: role === "retailer" ? distributorId : null,
+    distributorId: role === "customer" ? distributorId : null,
     isVerified: role === "distributor" ? false : true, // Distributors must be verified
   });
 
@@ -95,8 +95,8 @@ const userLogin = asyncHandler(async (req, res) => {
 
     const loggedUser = await User.findById(user._id).select("-password -refreshToken");
 
-    // If retailer, return distributorId
-    const extraData = user.role === "retailer" ? { distributorId: user.distributorId } : {};
+    // If customer, return distributorId
+    const extraData = user.role === "customer" ? { distributorId: user.distributorId } : {};
 
     const options = { httpOnly: true, secure: true };
     return res

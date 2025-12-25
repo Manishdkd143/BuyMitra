@@ -66,7 +66,6 @@ const orderSchema = new Schema({
 
   orderNotes: String,
   trackingNumber: String,
-
   confirmedAt: Date,
   shippedAt: Date,
   deliveredAt: Date,

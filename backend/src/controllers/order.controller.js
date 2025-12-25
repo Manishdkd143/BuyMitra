@@ -123,7 +123,7 @@ const getOrderById = asyncHandler(async (req, res) => {
   );
 });
 
-/* -------------------- MY ORDERS (RETAILER) -------------------- */
+/* -------------------- MY ORDERS (customer) -------------------- */
 
 const getMyOrders = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;

@@ -9,8 +9,8 @@ const create=asyncHandler(async(req,res)=>{
   if(!isLoggedUser){
     throw new ApiError(401,"Unauthorized user!please login")
   }
-  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
-    throw new ApiError(403,"Access-denied retailer not allowed!")
+  if(isLoggedUser?.role?.trim().toLowerCase()==="customer"){
+    throw new ApiError(403,"Access-denied customer not allowed!")
   }
   const {name,description,displayName}=req.body;
    if(!name&&name.length){
@@ -30,8 +30,8 @@ const deleteCategory=asyncHandler(async(req,res)=>{
   if(!isLoggedUser){
     throw new ApiError(401,"Unauthorized user!please login")
   }
-  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
-    throw new ApiError(403,"Access-denied retailer not allowed!")
+  if(isLoggedUser?.role?.trim().toLowerCase()==="customer"){
+    throw new ApiError(403,"Access-denied customer not allowed!")
   }
 })
 const getAllCategories=asyncHandler(async(req,res)=>{
@@ -39,8 +39,8 @@ const getAllCategories=asyncHandler(async(req,res)=>{
   if(!isLoggedUser){
     throw new ApiError(401,"Unauthorized user!please login")
   }
-  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
-    throw new ApiError(403,"Access-denied retailer not allowed!")
+  if(isLoggedUser?.role?.trim().toLowerCase()==="customer"){
+    throw new ApiError(403,"Access-denied customer not allowed!")
   }
   const allCat=await Category.find({}).select("-_id");
   if(!allCat&&allCat.length){
@@ -53,8 +53,8 @@ const getCategoryById=asyncHandler(async(req,res)=>{
   if(!isLoggedUser){
     throw new ApiError(401,"Unauthorized user!please login")
   }
-  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
-    throw new ApiError(403,"Access-denied retailer not allowed!")
+  if(isLoggedUser?.role?.trim().toLowerCase()==="customer"){
+    throw new ApiError(403,"Access-denied customer not allowed!")
   }
   const {categoryId}=req.params;
   if(!categoryId){
@@ -74,8 +74,8 @@ const updateCategoryDetails=asyncHandler(async(req,res)=>{
   if(!isLoggedUser){
     throw new ApiError(401,"Unauthorized user!please login")
   }
-  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
-    throw new ApiError(403,"Access-denied retailer not allowed!")
+  if(isLoggedUser?.role?.trim().toLowerCase()==="customer"){
+    throw new ApiError(403,"Access-denied customer not allowed!")
   }
    const {categoryId}=req.params;
   if(!categoryId){
@@ -103,8 +103,8 @@ const getCategoryStats=asyncHandler(async(req,res)=>{
   if(!isLoggedUser){
     throw new ApiError(401,"Unauthorized user!please login")
   }
-  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
-    throw new ApiError(403,"Access-denied retailer not allowed!")
+  if(isLoggedUser?.role?.trim().toLowerCase()==="customer"){
+    throw new ApiError(403,"Access-denied customer not allowed!")
   }
   const countCat=await Category.countDocuments({})
  const categorydetails= await Category.aggregate([
@@ -190,8 +190,8 @@ const getProductByCategory=asyncHandler(async(req,res)=>{
   if(!isLoggedUser){
     throw new ApiError(401,"Unauthorized user!please login")
   }
-  if(isLoggedUser?.role?.trim().toLowerCase()==="retailer"){
-    throw new ApiError(403,"Access-denied retailer not allowed!")
+  if(isLoggedUser?.role?.trim().toLowerCase()==="customer"){
+    throw new ApiError(403,"Access-denied customer not allowed!")
   }
   const {catName}=req.query;
   if(!catName&&catName!==undefined){

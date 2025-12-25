@@ -9,6 +9,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ExcelJS from "exceljs"
+import crypto from "crypto"
+import uploadFileOnCloud from "../utils/Cloudinary.js";
 const updateDistributor = asyncHandler(async (req, res) => {
   const isLoggedUser = req.user;
   
@@ -16,8 +18,8 @@ const updateDistributor = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
   
-  if (isLoggedUser.role?.toLowerCase() === "retailer") {
-    throw new ApiError(403, "Access denied! Retailer not allowed");
+  if (isLoggedUser.role?.toLowerCase() === "customer") {
+    throw new ApiError(403, "Access denied! customer not allowed");
   }
   
   const { businessName, gstNumber, businessEmail, businessPhone, city, state, pincode } = req.body;
@@ -131,21 +133,21 @@ const getDistributorProducts = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
 
-  if (user.role.toLowerCase() === "retailer") {
-    throw new ApiError(403, "Access denied for retailer");
+  if (user.role.toLowerCase() === "customer") {
+    throw new ApiError(403, "Access denied for customer");
   }
 
   const skip = (Number(page) - 1) * Number(limit);
 
   const query = { createdBy: user._id };
 
-  if (search.trim()) {
-    query.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { sku: { $regex: search, $options: "i" } },
-      { brand: { $regex: search, $options: "i" } },
-    ];
-  }
+  // if (search.trim()) {
+  //   query.$or = [
+  //     { name: { $regex: search, $options: "i" } },
+  //     { sku: { $regex: search, $options: "i" } },
+  //     { brand: { $regex: search, $options: "i" } },
+  //   ];
+  // }
 
   // const [total, allProducts] = await Promise.all([
   //   Product.countDocuments(query),
@@ -275,8 +277,8 @@ const getDistributorProductById = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
 
-  if (user.role.toLowerCase() === "retailer") {
-    throw new ApiError(403, "Access denied - not allowed for retailer!");
+  if (user.role.toLowerCase() === "customer") {
+    throw new ApiError(403, "Access denied - not allowed for customer!");
   }
 
   if (!mongoose.isValidObjectId(productId)) {
@@ -353,10 +355,10 @@ const getDistributorOrders = asyncHandler(async (req, res) => {
     filter.status = status.toLowerCase();
   }
 
-  // SEARCH (orderNumber + retailer name/email/phone)
+  // SEARCH (orderNumber + customer name/email/phone)
   if (search) {
     const matchingUsers = await User.find({
-      role: "retailer",
+      role: "customer",
       $or: [
         { name: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
@@ -559,8 +561,8 @@ const cancelOrder=asyncHandler(async(req,res)=>{
 const getOrdersByStatus=-asyncHandler(async(req,res)=>{
 
 })
-//Retailer Management
-const getDistributorsRetailers = asyncHandler(async (req, res) => {
+//customer Management
+const getDistributorscustomers = asyncHandler(async (req, res) => {
   console.log("congtroller");
   const isLoggedUser = req.user;
   const { page=1, limit = 10, search='' } = req.query;
@@ -578,7 +580,7 @@ const getDistributorsRetailers = asyncHandler(async (req, res) => {
   // 3. Base Query
   const baseQuery = {
     distributorId: isLoggedUser._id,
-    role: "retailer",
+    role: "customer",
   };
 
   // 4. Search filter
@@ -590,15 +592,15 @@ const getDistributorsRetailers = asyncHandler(async (req, res) => {
     ];
   }
 
-  // 5. Count total retailers
-  const totalRetailers = await User.countDocuments(baseQuery);
+  // 5. Count total customers
+  const totalcustomers = await User.countDocuments(baseQuery);
 
-  if (!totalRetailers) {
-    throw new ApiError(404, "Retailers not found!");
+  if (!totalcustomers) {
+    throw new ApiError(404, "customers not found!");
   }
 
-  // 6. Fetch retailer list
-  const retailers = await User.find(
+  // 6. Fetch customer list
+  const customers = await User.find(
     baseQuery,
     { name: 1, email: 1, phone: 1 }
   )
@@ -609,40 +611,40 @@ const getDistributorsRetailers = asyncHandler(async (req, res) => {
   // 7. Response
   return res.status(200).json(
     new ApiResponse(200, {
-      total: totalRetailers,
+      total: totalcustomers,
       page: Number(page),
       limit: Number(limit),
-      totalPages: Math.ceil(totalRetailers / limit),
-      retailers,
-    }, "Retailers fetched successfully")
+      totalPages: Math.ceil(totalcustomers / limit),
+      customers,
+    }, "customers fetched successfully")
   );
 });
 
-const getRetailerById = asyncHandler(async (req, res) => {
+const getcustomerById = asyncHandler(async (req, res) => {
   const isLoggedUser = req.user;
-  const { retailerId } = req.params;
+  const { customerId } = req.params;
 
   // 1. Not logged in
   if (!isLoggedUser) {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
 
-  // 2. Only Distributor can access retailer
+  // 2. Only Distributor can access customer
   if (isLoggedUser.role.toLowerCase() !== "distributor") {
     throw new ApiError(403, "Access-denied! Only distributors allowed");
   }
 
-  // 3. Validate retailerId
-  if (!retailerId) {
-    throw new ApiError(400, "Retailer ID is required");
+  // 3. Validate customerId
+  if (!customerId) {
+    throw new ApiError(400, "customer ID is required");
   }
 
-  // 4. Fetch retailer (must belong to distributor)
-  const retailer = await User.findOne(
+  // 4. Fetch customer (must belong to distributor)
+  const customer = await User.findOne(
     {
-      _id: retailerId,
-      role: "retailer",
-      distributorId: isLoggedUser._id, // Only their own retailer
+      _id: customerId,
+      role: "customer",
+      distributorId: isLoggedUser._id, // Only their own customer
     },
     {
       name: 1,
@@ -654,111 +656,68 @@ const getRetailerById = asyncHandler(async (req, res) => {
   );
 
   // 5. Not found
-  if (!retailer) {
-    throw new ApiError(404, "Retailer not found or not linked to this distributor");
+  if (!customer) {
+    throw new ApiError(404, "customer not found or not linked to this distributor");
   }
 
   // 6. Send response
   return res.status(200).json(
-    new ApiResponse(200, retailer, "Retailer fetched successfully")
+    new ApiResponse(200, customer, "customer fetched successfully")
   );
 });
 
-const approveRetailer = asyncHandler(async (req, res) => {
+const approvecustomer = asyncHandler(async (req, res) => {
   const isLoggedUser = req.user;
-  const { retailerId } = req.params;
+  const { customerId } = req.params;
 
   // 1. Authentication check
   if (!isLoggedUser) {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
 
-  // 2. Only distributors can approve retailers
+  // 2. Only distributors can approve customers
   if (isLoggedUser.role.toLowerCase() !== "distributor") {
-    throw new ApiError(403, "Access denied! Only distributors can approve retailers.");
+    throw new ApiError(403, "Access denied! Only distributors can approve customers.");
   }
 
-  // 3. Retailer ID validation
-  if (!retailerId) {
-    throw new ApiError(400, "Retailer ID is required");
+  // 3. customer ID validation
+  if (!customerId) {
+    throw new ApiError(400, "customer ID is required");
   }
 
-  // 4. Find the retailer (must belong to this distributor)
-  const retailer = await User.findOne({
-    _id: retailerId,
-    role: "retailer",
+  // 4. Find the customer (must belong to this distributor)
+  const customer = await User.findOne({
+    _id: customerId,
+    role: "customer",
     distributorId: isLoggedUser._id,
   });
 
-  if (!retailer) {
+  if (!customer) {
     throw new ApiError(
       404,
-      "Retailer not found or not associated with this distributor"
+      "customer not found or not associated with this distributor"
     );
   }
 
   // 5. Already approved?
-  if (retailer.status === "approved") {
-    throw new ApiError(400, "Retailer is already approved");
+  if (customer.status === "approved") {
+    throw new ApiError(400, "customer is already approved");
   }
 
   // 6. Update status
-  retailer.status = "approved";
-  await retailer.save();
+  customer.status = "approved";
+  await customer.save();
 
   // 7. Success response
   return res.status(200).json(
-    new ApiResponse(200, retailer, "Retailer approved successfully")
+    new ApiResponse(200, customer, "customer approved successfully")
   );
 });
 
-// const getRetailerOrders=as(async(req,res)=>{
+// const getcustomerOrders=as(async(req,res)=>{
 
 // })
-const addRetailer = asyncHandler(async (req, res) => {
-  const distributor = req.user;
 
-  if (!distributor) {
-    throw new ApiError(401, "Unauthorized user!");
-  }
-
-  if (distributor.role !== "distributor") {
-    throw new ApiError(403, "Only distributors can add retailers!");
-  }
-
-  const { name, email, phone, gender, city, pincode } = req.body;
-
-  // Validate fields
-  if ([name, email, phone, gender, city, pincode].some(f => !f?.trim())) {
-    throw new ApiError(400, "All fields are required!");
-  }
-
-  // Check email exists
-  const exists = await User.findOne({ email: email.trim().toLowerCase() });
-  if (exists) {
-    throw new ApiError(409, "Retailer already registered!");
-  }
-
-  // Create retailer
-  const retailer = await User.create({
-    name: name.trim(),
-    email: email.trim().toLowerCase(),
-    password: "Retailer@123",  // default password OR generate random
-    phone,
-    gender: gender.toLowerCase(),
-    role: "retailer",
-    distributorId: distributor._id,
-    address: {
-      city: city.trim().toLowerCase(),
-      pincode: Number(pincode)
-    },
-    isVerified: true
-  });
-
-  return res.status(201).json(
-    new ApiResponse(201, retailer, "Retailer added successfully!")
-  );
-});
 
 //Profiles
 const getCompanyProfile=asyncHandler(async(req,res)=>{
@@ -1431,7 +1390,7 @@ const exportsProductsToExcel=asyncHandler(async(req,res)=>{
    await workBook.xlsx.write(res);
    res.status(200).end()
 })
-// retailer.controller.js
+// customer.controller.js
 const getAllApprovedDistributors = asyncHandler(async (req, res) => {
     const { search = "" } = req.query; // search query from frontend
 
@@ -1594,7 +1553,7 @@ const verifyDistributorDocument = asyncHandler(async (req, res) => {
     )
   );
 });
-const getTopRetailers = asyncHandler(async (req, res) => {
+const getTopcustomers = asyncHandler(async (req, res) => {
   const distributorId = req.user._id;
 
   if (!distributorId) {
@@ -1606,7 +1565,7 @@ const getTopRetailers = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Access denied! Only distributors allowed.");
   }
 
-  const retailers = await Order.aggregate([
+  const customers = await Order.aggregate([
     {
       $match: { distributorId: distributorId }
     },
@@ -1622,18 +1581,18 @@ const getTopRetailers = asyncHandler(async (req, res) => {
         from: "users",
         localField: "_id",
         foreignField: "_id",
-        as: "retailer"
+        as: "customer"
       }
     },
     {
-      $unwind: "$retailer"
+      $unwind: "$customer"
     },
     {
       $project: {
         _id: 0,
-        retailerId: "$retailer._id",
-        name: "$retailer.name",
-        email: "$retailer.email",
+        customerId: "$customer._id",
+        name: "$customer.name",
+        email: "$customer.email",
         totalOrders: 1,
         revenue: "$totalRevenue"
       }
@@ -1642,58 +1601,225 @@ const getTopRetailers = asyncHandler(async (req, res) => {
       $sort: { revenue: -1 }  // Highest revenue first
     },
     {
-      $limit: 10  // Top 10 retailers
+      $limit: 10  // Top 10 customers
     }
   ]);
 
   return res.status(200).json(
     new ApiResponse(
       200,
-      retailers,
-      "Top retailers fetched successfully"
+      customers,
+      "Top customers fetched successfully"
     )
   );
 });
 
-const getBusinessProfile=asyncHandler(async(req,res)=>{
-const user=req.user;
-if(!user||user.role==="retailer"){
-  throw new ApiError(401,"Access denied!only distributor allowed")
-}
-await DistributorProfile.aggregate([
-  {
-    $match:{
-      userId:user._id
-    }
-  },
-  {
-    $lookup:{
+const getCustomersInsights=asyncHandler(async(req,res)=>{
+   const user=req.user;
+   if(!user||user.role==="customer"){
+    throw new ApiError(401,"Access denied only distributor allowed!")
+   }
+   const {page=1,limit=10,search=""}=req.query;
+   const skip=(Number(page) - 1)*Number(limit);
+ const orderCustomers=  await Order.aggregate([
+    {
+      $match:{
+        distributorId:user._id,
+        status:{$ne:"cancelled"}
+      }
+    },
+    {
+      $group:{
+        _id:"userId",
+        totalOrders:{$sum:1},
+        totalSpent:{$sum:"$totalAmount"},
+        outStanding:{
+          $sum:{
+            $cond:[
+              {$in:["$paymentStatus",["unpaid","partially_paid"]]},
+                 "$totalAmount",
+                 0
+            ]
+          }
+        },
+       lastOrderDate:{$max:"$createdAt"},
+       
+      }
+    },
+    {
+     $lookup:{
       from:"users",
-      localField:"userId",
+      localField:"_id",
       foreignField:"_id",
-      as:"user",
+      as:"customer"
+     }
+    },
+    {
+      $unwind:"$customer"
+    },
+    ...(search?[
+     {
+      $match:{
+        $or:[
+          {
+            "$customer.name":{$regex:search,$options:"i"}
+          },
+          {
+            "$customer.phone":{$regex:search,$options:"i"}
+          },
+          {
+            "$customer.email":{$regex:search,$options:"i"}
+          }
+        ]
+      }
+     }
+
+    ]:[]),
+    {
+      $project:{
+        _id:0,
+        customerId:"$_id",
+        name:"$customer.name",
+        phone:"$customer.phone",
+        email:"$customer.email",
+        totalOrders:1,
+        totalSpent:1,
+        outStanding:1,
+        lastOrderDate:1,
+      }
+    },
+    {
+      $skip:Number(skip)
+    },
+    {
+      $limit:Number(limit)
     }
-  },
-  {
-    $unwind:"$user"
-  },
-  {
-    $project:{
-      ownerName:"$user.name",
-      ownerPhone:"$user.phone",
-      ownerEmail:"$user.email",
-      shopName:"$businessName",
-      userId:"$userId",
-      businessType:"$businessType",
-      status:"$status",
-      gstNumber:"$gstNumber"
-    }
-  }
-])
+   ])
+   const Customers=orderCustomers.data;
+   const totalCustomers=orderCustomers.length;
+   return res.status(200).json(new ApiResponse(200,{customers:orderCustomers,meta:{
+    currentPage:Number(page),
+    totalPages:Math.ceil(Number(totalCustomers)/Number(limit)),
+    totalCustomers,
+   }},"All customer fetched successfully"))
 })
-export {updateDistributor,getBusinessProfile,approveRetailer,getAllApprovedDistributors,
-  getDistributorProducts,getDistributorProductById,getDistributorOrders
-  
-  ,getDistributorOrderById,OrderStatusChange,getDistributorsRetailers,getRetailerById,getCompanyProfile,getDashboardReports,updateWholesalePricing,
+const getCustomersDirectory = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { page = 1, limit = 10, search = "" } = req.query;
+  if (!user || user.role !== "distributor") {
+    throw new ApiError(401, "Access denied! Only distributor allowed.");
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const query = {
+    role: "customer",
+    distributorId: user._id,
+  };
+
+  if (search && search.trim()) {
+    query.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+      { phone: { $regex: search, $options: "i" } },
+    ];
+  }
+
+
+  const customers = await User.find(query)
+    .select("name phone email status createdAt")
+    .skip(skip)
+    .limit(Number(limit))
+    .sort({ createdAt: -1 });
+
+  const totalCustomers = await User.countDocuments(query);
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      customers,
+      meta: {
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalCustomers / limit),
+        totalCustomers,
+      },
+    }, "Customers fetched successfully")
+  );
+});
+const addcustomer = asyncHandler(async (req, res) => {
+  const distributor = req.user;
+
+  if (!distributor) {
+    throw new ApiError(401, "Unauthorized user!");
+  }
+
+  if (distributor.role !== "distributor") {
+    throw new ApiError(403, "Only distributors can add customers!");
+  }
+
+  const { name, email, phone, gender, city, pincode,state } = req.body;
+
+  // Validate fields
+  if ([name, email, phone, gender, city, pincode].some(f => !f?.trim())) {
+    throw new ApiError(400, "All fields are required!");
+  }
+ const normalizedEmail=email?.toLowerCase().trim()
+ const normalizedPhone=phone?.trim()
+
+  // Check email exists
+const exists=await User.findOne({
+  distributorid:distributor._id,
+  role:"customer",
+  $or:[
+    {
+      phone:normalizedPhone
+    },
+    ...(normalizedEmail?[{email:normalizedEmail}]:[])
+  ]
+})
+  if (exists) {
+    throw new ApiError(409, "customer already registered!");
+  }
+  const {password}=req.body;
+
+if(password?.trim().length<6){
+  throw new ApiError(400,"Password length must be 6 character")
+}
+let uploadedFilePath=null;
+if(req.file?.path){
+uploadedFilePath=await uploadFileOnCloud(req.file.path)
+if(!uploadedFilePath){
+  throw new ApiError(400,"file uploaded failed!")
+}
+}
+const tempPassword=crypto.randomBytes(6).toString("hex")
+  // Create customer
+  const customer = await User.create({
+    name: name.trim(),
+    email: normalizedEmail,
+    password:tempPassword,
+    phone:normalizedPhone,
+    gender: gender.toLowerCase(),
+    role: "customer",
+    distributorId: distributor._id,
+    profilePic:uploadedFilePath?.url||null,
+    address: {
+         city: city.trim(),
+      state: state?.trim(),
+      pincode: Number(pincode),
+      country: "India",
+    },
+    isVerified: true
+  });
+const response=customer.toObject();
+delete response.password;
+delete response.refreshToken;
+  return res.status(201).json(
+    new ApiResponse(201, {customer:response,tempPassword}, "customer added successfully!")
+  );
+});
+export {updateDistributor,getCustomersInsights,approvecustomer,getAllApprovedDistributors,
+  getDistributorProducts,getDistributorProductById,getDistributorOrders,
+  getCustomersDirectory
+  ,getDistributorOrderById,OrderStatusChange,getDistributorscustomers,getcustomerById,getCompanyProfile,getDashboardReports,updateWholesalePricing,
   exportsProductsToExcel,uploadDistributorDocs,deleteDistributorDocument,verifyDistributorDocument,
-getTopRetailers,addRetailer}
+getTopcustomers,addcustomer}

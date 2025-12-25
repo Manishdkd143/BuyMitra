@@ -16,8 +16,8 @@ const createProduct = asyncHandler(async (req, res) => {
   const user = req.user;
 
   if (!user) throw new ApiError(401, "Unauthorized");
-  if (user.role === "retailer")
-    throw new ApiError(403, "Retailer not allowed");
+  if (user.role === "customer")
+    throw new ApiError(403, "customer not allowed");
 
   const {
     name,
@@ -123,7 +123,7 @@ const updateProductdetails = asyncHandler(async (req, res) => {
   console.log("Update product req.files:", req.files);
 
   const user = req.user;
-  if (!user || user.role === "retailer") {
+  if (!user || user.role === "customer") {
     throw new ApiError(403, "Not allowed");
   }
 
@@ -289,7 +289,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const user = req.user;
 
-  if (!user || user.role === "retailer") {
+  if (!user || user.role === "customer") {
     throw new ApiError(403, "Not allowed");
   }
 
@@ -447,7 +447,7 @@ if(insertedProducts.length&&inventory.length){
 
 const getAllProducts = asyncHandler(async (req, res) => {
   const user = req.user;
-  if (!user || user.role === "retailer")
+  if (!user || user.role === "customer")
     throw new ApiError(403, "Not allowed");
 
   const {
@@ -506,7 +506,7 @@ const getProductDetails = asyncHandler(async (req, res) => {
   if (!user)
     throw new ApiError(401, "Unauthorized user");
 
-  if (user.role === "retailer")
+  if (user.role === "customer")
     throw new ApiError(403, "Access denied");
 
   const { productId } = req.params;
@@ -550,7 +550,7 @@ const getProductDetails = asyncHandler(async (req, res) => {
 });
 const getLowStockProducts=asyncHandler(async(req,res)=>{
   const user=req.user;
-  if(!user||user.role==="retailer"){
+  if(!user||user.role==="customer"){
     throw new ApiError(403,"Not allowed!");
   }
    const {
@@ -652,7 +652,7 @@ const productData = await Inventory.aggregate([
 })
 const getOutStockProducts=asyncHandler(async(req,res)=>{
   const user=req.user;
-  if(!user||user.role==="retailer"){
+  if(!user||user.role==="customer"){
     throw new ApiError(401,"access denied only distributor allowed!")
   }
     const page = Number(req.query.page) || 1;

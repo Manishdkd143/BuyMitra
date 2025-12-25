@@ -3,8 +3,8 @@ import verifyJWT from "../middleware/auth.middleware.js";
 import { isAdmin, isAdminOrDistributor } from "../middleware/role.middleware.js";
 
 import {
-  addRetailer,
-  approveRetailer,
+  addcustomer,
+  approvecustomer,
   deleteDistributorDocument,
   exportsProductsToExcel,
   getAllApprovedDistributors,
@@ -13,15 +13,17 @@ import {
   getDistributorProductById,
   getDistributorProducts,
   getCompanyProfile,
-  getDistributorsRetailers,
+  getDistributorscustomers,
   getDashboardReports,
-  getRetailerById,
-  getTopRetailers,
+  getcustomerById,
+  getTopcustomers,
   OrderStatusChange,
   updateDistributor,
   updateWholesalePricing,
   uploadDistributorDocs,
-  verifyDistributorDocument
+  verifyDistributorDocument,
+  getCustomersInsights,
+  getCustomersDirectory
 } from "../controllers/distributor.controller.js";
 
 
@@ -50,18 +52,19 @@ router.patch(
 router.patch("/update", isAdminOrDistributor, updateDistributor);
 
 /* -----------------------------
-   RETAILERS
+   customerS
 ------------------------------ */
-router.get("/retailers", isAdminOrDistributor, getDistributorsRetailers);
+router.get("/customers",isAdminOrDistributor,getCustomersDirectory)
+router.get("/customers/insights", isAdminOrDistributor,getCustomersInsights );
 
-router.post("/add-retailer", addRetailer);
+router.post("/add-customer",isAdminOrDistributor,Upload.single("profilePic") ,addcustomer);
 
-router.get("/retailer/:retailerId", isAdminOrDistributor, getRetailerById);
+router.get("/customer/:customerId", isAdminOrDistributor, getcustomerById);
 
 router.put(
-  "/retailers/approve/:retailerId",
+  "/customers/approve/:customerId",
   isAdminOrDistributor,
-  approveRetailer
+  approvecustomer
 );
 
 /* -----------------------------
@@ -97,7 +100,7 @@ router.put("/order/status/:id", isAdminOrDistributor, OrderStatusChange);
 ------------------------------ */
 // router.get("/report", isAdminOrDistributor, getDistributorDashboard);
 
-router.get("/top-retailers", getTopRetailers);
+router.get("/top-customers", getTopcustomers);
 
 /* -----------------------------
    EXPORT PRODUCTS TO EXCEL

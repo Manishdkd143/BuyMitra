@@ -1,16 +1,16 @@
 
 import API from "../../api/axios";
-export const createRetailer = async(data) =>{
-  const res=await API.post("/distributor/add-retailer", data, {
-    withCredentials: true,
-  });
-  console.log(res);
-  
+export  async  function getCustomersInsights({page=1,limit=10,search=""}){
+ const res= await API.get("distributor/customers/insights",{params:{page,limit,search},withCredentials:true})
+ console.log("customers",res);
+ return res
+}
+export  async function getCustomersDirectory({page=1,limit=10,search=""}) {
+  const res=await API.get("/distributor/customers",{params:{page,limit,search},withCredentials:true})
+   console.log("customers",res);
+ return res
+}
+export async function addCustomer(formData) {
+  const res=API.post("/distributor/add-customer",formData,{withCredentials:true,headers:"multipart/form-data"})
   return res
 }
-export const getRetailers = async ({ page, limit = 10, search = "" }) => {
-  return await API.get("/distributor/retailers", {
-    params: { page, limit, search },   // QUERY
-    withCredentials: true              // SEPARATE CONFIG
-  });
-};

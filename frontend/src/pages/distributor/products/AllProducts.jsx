@@ -37,7 +37,6 @@ const AllProducts = () => {
   const loadProducts = async (page = 1, searchText = "") => {
     try {
       setLoading(true);
-
       const res = await getDistributorProducts({
         page,
         limit: 10,

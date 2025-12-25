@@ -7,7 +7,7 @@ const DistributorHeader = () => {
 
 
   return (
-     <header className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between">
+     <header className="h-16 text-white  bg-linear-to-br from-slate-900 via-purple-700 to-slate-700 border-b border-gray-200 px-6 flex items-center justify-between">
 
       {/* LEFT */}
       <div className="flex items-center gap-4">
@@ -15,14 +15,14 @@ const DistributorHeader = () => {
           BM
         </div>
         <div>
-          <p className="font-semibold text-gray-900">Distributor Panel</p>
-          <p className="text-xs text-gray-500">Product Management</p>
+          <p className="font-semibold text-gray-50">Distributor Panel</p>
+          <p className="text-xs text-gray-50">Product Management</p>
         </div>
       </div>
 
       {/* RIGHT */}
       <div className="flex items-center gap-6">
-        <button className="relative text-gray-600 hover:text-gray-900">
+        <button className="relative text-gray-50 hover:text-gray-900">
           <Bell size={20} />
           <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
         </button>
@@ -32,10 +32,10 @@ const DistributorHeader = () => {
             {user?.name?.[0] || "U"}
           </div>
           <div className="leading-tight">
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-sm font-medium text-gray-50">
               {user?.name || "Distributor"}
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-50">
               Distributor ID: #{user?._id?.slice(-4)}
             </p>
           </div>

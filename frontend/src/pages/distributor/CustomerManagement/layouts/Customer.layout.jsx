@@ -60,7 +60,7 @@ const CustomerLayout = () => {
  {/* ===== Customer MANAGEMENT (CORE) ===== */}
             <p className={sectionTitle}>Customer Management</p>
 
-            <NavLink to="/c/customers/add" className={linkClass}>
+            <NavLink to="/distributor/customers/manage/add" className={linkClass}>
               <UserPlus className="w-4 h-4" />
               Add Customer
             </NavLink>
@@ -69,12 +69,10 @@ const CustomerLayout = () => {
               <Users className="w-4 h-4" />
               Customer List
             </NavLink>
-
-            <NavLink to="/c/customers/pending" className={linkClass}>
-              <UserCheck className="w-4 h-4" />
-              Pending Approvals
+              <NavLink to="/distributor/customers/manage/insights" className={linkClass}>
+              <Users className="w-4 h-4" />
+              Customer Insights
             </NavLink>
-
             <NavLink to="/customer/customers/ledger" className={linkClass}>
               <IndianRupee className="w-4 h-4" />
               Customer Ledger

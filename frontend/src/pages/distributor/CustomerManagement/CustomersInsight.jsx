@@ -9,40 +9,44 @@ import {
   FileText,
 } from "lucide-react";
 
-const customersMock = [
-  {
-    id: "c1",
-    name: "Rahul Sharma",
-    phone: "98xxxxxx23",
-    email: "rahul@gmail.com",
-    totalOrders: 24,
-    totalSpent: 12400,
-    outstanding: 1200,
-    lastOrder: "2 days ago",
-    status: "active",
-  },
-  {
-    id: "c2",
-    name: "Amit Verma",
-    phone: "97xxxxxx11",
-    email: "amit@gmail.com",
-    totalOrders: 8,
-    totalSpent: 5600,
-    outstanding: 0,
-    lastOrder: "12 days ago",
-    status: "blocked",
-  },
-];
+import useDebounce from "../../../hooks/useDebounce";
+import { getCustomersInsights } from "../../../services/distributor/customer.service";
 
-const CustomerList = () => {
+const CustomersInsight = () => {
   const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [meta, setMeta] = useState({
+      currentPage:1,
+      totalPages:1,
+      totalCustomers:0,
+  })
   const [openMenu, setOpenMenu] = useState(null);
-
+  const debouncedSearch=useDebounce(search,300)
+   const loadCustomers=async(page=1,searchText="")=>{
+    try {
+      setLoading(true)
+      const res=await getCustomersInsights({page,limit:10,search:searchText}).then(res=>res.data);
+       setCustomers(res.data.customers||[])
+      setMeta({
+        currentPage:page,
+        totalPages:res.data.totalPages,
+        totalCustomers:res.data.totalCustomers,
+      })
+    } catch (error) {
+      console.error("Customer fetched failed!",error?.message)
+    }finally{
+      setLoading(false)
+    }
+   }
   useEffect(() => {
-    setCustomers(customersMock);
+    loadCustomers()
   }, []);
+  useEffect(() => {
+   loadCustomers(1,debouncedSearch||"")
+  }, [debouncedSearch])
+  
 
   const filteredCustomers = customers.filter((c) => {
     const matchSearch =
@@ -124,13 +128,20 @@ const CustomerList = () => {
             </thead>
 
             <tbody>
-              {filteredCustomers.length === 0 ? (
+               {loading ? (
                 <tr>
-                  <td colSpan="7" className="py-10 text-center text-gray-400">
-                    No customers found
+                  <td colSpan="7" className="py-20 text-center text-slate-400">
+                    Loading products...
                   </td>
                 </tr>
-              ) : (
+              ) : customers.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-20 text-center text-slate-400">
+                    No Customers found
+                  </td>
+                </tr>
+              ):
+              (
                 filteredCustomers.map((c) => (
                   <tr key={c.id}
                       className="border-t border-white/10
@@ -216,7 +227,7 @@ const CustomerList = () => {
   );
 };
 
-export default CustomerList;
+export default CustomersInsight;
 
 /* ================= ACTION ITEM ================= */
 const ActionItem = ({ icon, text, danger }) => (

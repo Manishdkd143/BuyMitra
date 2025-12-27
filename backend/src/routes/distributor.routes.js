@@ -3,8 +3,6 @@ import verifyJWT from "../middleware/auth.middleware.js";
 import { isAdmin, isAdminOrDistributor } from "../middleware/role.middleware.js";
 
 import {
-  addcustomer,
-  approvecustomer,
   deleteDistributorDocument,
   exportsProductsToExcel,
   getAllApprovedDistributors,
@@ -13,17 +11,13 @@ import {
   getDistributorProductById,
   getDistributorProducts,
   getCompanyProfile,
-  getDistributorscustomers,
   getDashboardReports,
-  getcustomerById,
-  getTopcustomers,
   OrderStatusChange,
   updateDistributor,
   updateWholesalePricing,
   uploadDistributorDocs,
   verifyDistributorDocument,
-  getCustomersInsights,
-  getCustomersDirectory
+
 } from "../controllers/distributor.controller.js";
 
 
@@ -51,21 +45,7 @@ router.patch(
 
 router.patch("/update", isAdminOrDistributor, updateDistributor);
 
-/* -----------------------------
-   customerS
------------------------------- */
-router.get("/customers",isAdminOrDistributor,getCustomersDirectory)
-router.get("/customers/insights", isAdminOrDistributor,getCustomersInsights );
 
-router.post("/add-customer",isAdminOrDistributor,Upload.single("profilePic") ,addcustomer);
-
-router.get("/customer/:customerId", isAdminOrDistributor, getcustomerById);
-
-router.put(
-  "/customers/approve/:customerId",
-  isAdminOrDistributor,
-  approvecustomer
-);
 
 /* -----------------------------
    PRODUCTS
@@ -95,12 +75,7 @@ router.get("/order/:id", isAdminOrDistributor, getDistributorOrderById);
 
 router.put("/order/status/:id", isAdminOrDistributor, OrderStatusChange);
 
-/* -----------------------------
-   INVENTORY REPORT
------------------------------- */
-// router.get("/report", isAdminOrDistributor, getDistributorDashboard);
 
-router.get("/top-customers", getTopcustomers);
 
 /* -----------------------------
    EXPORT PRODUCTS TO EXCEL

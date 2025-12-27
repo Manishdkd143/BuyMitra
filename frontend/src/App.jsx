@@ -34,9 +34,7 @@ import EditCompanyProfile from "./pages/distributor/EditComProfile";
 import CompanyProfile from "./pages/distributor/CompanyProfile";
 import EditProduct from "./pages/distributor/products/EditProduct";
 import CustomerLayout from "./pages/distributor/CustomerManagement/layouts/Customer.layout";
-import CustomersDirectory from "./pages/distributor/CustomerManagement/CustomersDirectory";
-import CustomersInsight from "./pages/distributor/CustomerManagement/CustomersInsight";
-import AddCustomer from "./pages/distributor/CustomerManagement/AddCustomer";
+import CustomerOverview from "./pages/distributor/CustomerManagement/CustomerDetaiilsHub/CustomerOverview";
 function App() {
   return (
     <>
@@ -99,9 +97,8 @@ function App() {
           <Route path="/distributor/customers/manage" element={ <ProtectedRoute allowedRoles={["distributor"]}>
            <CustomerLayout/>
           </ProtectedRoute>}>
-          <Route path="all" element={<CustomersDirectory/>}/>
-          <Route path="add" element={<AddCustomer/>}/>
-           <Route path="insights" element={<CustomersInsight/>}/>
+          <Route path="/:customerId" element={<CustomerOverview/>}/>
+        
           </Route>
       </Routes>
      

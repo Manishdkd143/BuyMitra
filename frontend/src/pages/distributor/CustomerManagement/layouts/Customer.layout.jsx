@@ -73,26 +73,6 @@ const CustomerLayout = () => {
               <Users className="w-4 h-4" />
               Customer Insights
             </NavLink>
-            <NavLink to="/customer/customers/ledger" className={linkClass}>
-              <IndianRupee className="w-4 h-4" />
-              Customer Ledger
-            </NavLink>
-
-            <NavLink to="/c/customers/activity" className={linkClass}>
-              <ListChecks className="w-4 h-4" />
-              Customer Activity
-            </NavLink>
-
-            {/* PAYMENTS */}
-            <p className={sectionTitle}>Finance</p>
-            <NavLink to="/customer/payments" className={linkClass}>
-              <IndianRupee className="w-4 h-4" />
-              Payments
-            </NavLink>
-           
-
-           
-
            
           </nav>
 

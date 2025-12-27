@@ -1,20 +1,20 @@
-import React from 'react'
 
 import { useEffect, useState } from "react";
 import useDebounce from '../../../hooks/useDebounce';
-import { getCustomersDirectory } from '../../../services/distributor/customer.service';
-
+import { getCustomersDirectory } from "../../../services/distributor/customer.service";
+import { useNavigate } from "react-router-dom";
 
 const CustomerDirectory = () => {
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState("");
+ 
 const debouncedSearch=useDebounce(search,300)
   const [meta, setMeta] = useState({
     currentPage: 1,
     totalPages: 1,
     totalCustomers: 0,
   });
-
+const navigate=useNavigate();
   const [loading, setLoading] = useState(true);
 
   const fetchCustomers = async (page = 1) => {
@@ -31,11 +31,15 @@ const debouncedSearch=useDebounce(search,300)
       setLoading(false);
     }
   };
-
   useEffect(() => {
     fetchCustomers(1);
   }, [debouncedSearch]);
 
+  const handleNavigate=(path)=>{
+    setTimeout(() => {
+      navigate(path)
+    }, 500);
+  }
   return (
     <div className="bg-slate-900 p-6 rounded-xl">
       {/* HEADER */}
@@ -76,13 +80,13 @@ const debouncedSearch=useDebounce(search,300)
               </tr>
             ) : customers.length === 0 ? (
               <tr>
-                <td colSpan="5" className="text-center py-8 text-gray-400">
+                <td colSpan="5" className="text-center py-8 text-gray-400" >
                   No customers found
                 </td>
               </tr>
             ) : (
               customers.map((customer) => (
-                <CustomerRow key={customer._id} customer={customer} />
+                <CustomerRow key={customer._id} customer={customer} onView={()=>handleNavigate(`/distributor/customers/manage/c/${customer._id}`)}/>
               ))
             )}
           </tbody>
@@ -101,11 +105,12 @@ const debouncedSearch=useDebounce(search,300)
 
 
 
-const CustomerRow = ({ customer }) => {
+const CustomerRow = ({ customer,onView }) => {
+  
   return (
     <tr className="border-b border-gray-800 hover:bg-slate-800/50">
       {/* CUSTOMER */}
-      <td className="py-3 flex items-center gap-3">
+      <td className="py-3 flex items-center gap-3" onClick={onView}>
         <img
           src={customer.profilePic}
           alt={customer.name}

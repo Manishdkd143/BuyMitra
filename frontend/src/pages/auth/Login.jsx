@@ -15,9 +15,9 @@ const Login = () => {
   useEffect(() => {
     if (!loading ) {
       if (user?.role === "distributor") {
-        setTimeout(() => {
+      
           navigate("/distributor/dashboard");
-        }, 500);
+    
   } else if (user?.role === "retailer") {
     setTimeout(() => {
       navigate("/retailer/dashboard");
@@ -40,7 +40,6 @@ const Login = () => {
     if (!formData.email || !formData.password) {
       setError("Both fields are required");
       setLoading(false);
-
       return;
     }
 
@@ -48,10 +47,11 @@ const Login = () => {
       if(result.success&&result.data){
           setLoading(false)
       }
-    if (!result.success) toast.error(result.message);
-   
-    setLoading(false);
-    
+    if (!result.success){
+      setError(result?.message||"Invalid credentials!")
+       toast.error(result?.message);
+      }
+      setLoading(false);
   };
     const handleNavigate = (path) => {
     navigate(`${path}`)

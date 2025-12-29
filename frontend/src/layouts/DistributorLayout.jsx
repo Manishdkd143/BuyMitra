@@ -15,11 +15,7 @@ const DistributorLayout = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
-
-      {/* ✅ HEADER (TOP BAR) */}
       <DistributorHeader />
-
-      {/* ✅ BODY (SIDEBAR + CONTENT) */}
       <div className="flex flex-1">
 
         {/* SIDEBAR */}
@@ -52,7 +48,7 @@ const DistributorLayout = () => {
               Product Management
             </NavLink>
 
-            <NavLink to="/distributor/orders" className={linkClass}>
+            <NavLink to="/distributor/orders/manage/all" className={linkClass}>
               <ShoppingCart className="w-5 h-5" />
               Order Management
             </NavLink>

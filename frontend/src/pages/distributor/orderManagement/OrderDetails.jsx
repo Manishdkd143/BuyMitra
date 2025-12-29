@@ -4,7 +4,7 @@ import StatusBadge from "../../../components/StatusBadge";
 import Timeline from "../../../components/Timeline";
 import { toast } from "react-toastify";
 import { useParams } from "react-router-dom";
-export default function OrderById() {
+export default function OrderDetails() {
   const { orderId } = useParams();
   const [order, setOrder] = useState(null);
   const [timeline, setTimeline] = useState([]);
@@ -25,7 +25,6 @@ export default function OrderById() {
         setLoading(false);
     }
 };
-
 useEffect(() => {
   fetchOrder();
 }, [orderId]);

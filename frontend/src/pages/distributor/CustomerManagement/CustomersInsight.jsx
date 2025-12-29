@@ -27,7 +27,7 @@ const CustomersInsight = () => {
    const loadCustomers=async(page=1,searchText="")=>{
     try {
       setLoading(true)
-      const res=await getCustomersInsights({page,limit:10,search:searchText}).then(res=>res.data);
+      const res=await getCustomersInsights({page,limit:10,search:searchText});
        setCustomers(res.data.customers||[])
       setMeta({
         currentPage:page,

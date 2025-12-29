@@ -23,9 +23,6 @@ import "react-toastify/ReactToastify.css"
 import AddProduct from "./pages/distributor/products/AddProduct";
 import AllProducts from "./pages/distributor/products/AllProducts";
 import ProductDetails from "./pages/distributor/products/ProductDetails";
-
-import DistributorOrders from "./pages/distributor/order/DistributorOrders";
-import OrderById from "./pages/distributor/order/DistOrderDetails";
 import ProductManagementLayout from "./pages/distributor/products/ProductManagementLayout";
 import LowStock from "./pages/distributor/products/LowStock";
 import OutStock from "./pages/distributor/products/OutStock";
@@ -35,6 +32,14 @@ import CompanyProfile from "./pages/distributor/CompanyProfile";
 import EditProduct from "./pages/distributor/products/EditProduct";
 import CustomerLayout from "./pages/distributor/CustomerManagement/layouts/Customer.layout";
 import CustomerOverview from "./pages/distributor/CustomerManagement/CustomerDetaiilsHub/CustomerOverview";
+import CustomerDirectory from "./pages/distributor/CustomerManagement/CustomersDirectory";
+import AddCustomer from "./pages/distributor/CustomerManagement/AddCustomer";
+import CustomersInsight from "./pages/distributor/CustomerManagement/CustomersInsight";
+import OrderLayout from "./pages/distributor/orderManagement/layout/OrderLayout";
+import OrdersList from "./pages/distributor/orderManagement/OrdersList";
+import PendingOrders from "./pages/distributor/orderManagement/PendingOrders";
+import DeliveredOrders from "./pages/distributor/orderManagement/DeliveredOrders";
+import CancelledOrders from "./pages/distributor/orderManagement/CancelledOrders";
 function App() {
   return (
     <>
@@ -66,16 +71,6 @@ function App() {
           {/* Profile */}
           <Route path="profile" element={<CompanyProfile/>} />
           <Route path="profile/edit" element={<EditCompanyProfile />} />
-           
-         
-          {/* Products */}
-          {/* <Route path="product/add-product" element={<AddProduct />} />
-          <Route path="products" element={<AllProducts />} />
-          <Route path="products/:productId" element={<ProductDetails />} /> */}
-
-          {/* Orders */}
-          <Route path="orders" element={<DistributorOrders />} />
-          <Route path="order/:orderId" element={<OrderById />} />
         </Route>
         //product Management
           <Route path="/distributor/products/manage"
@@ -97,9 +92,25 @@ function App() {
           <Route path="/distributor/customers/manage" element={ <ProtectedRoute allowedRoles={["distributor"]}>
            <CustomerLayout/>
           </ProtectedRoute>}>
-          <Route path="/:customerId" element={<CustomerOverview/>}/>
-        
+          <Route path="add" element={<AddCustomer/>}/>
+          <Route path="all" element={<CustomerDirectory/>}/>
+          <Route path="c/:customerId" element={<CustomerOverview/>}/>
+          <Route path="insights" element={<CustomersInsight/>}/>
           </Route>
+      //order management 
+      <Route path="/distributor/orders/manage" element={<ProtectedRoute allowedRoles={["distributor"]}>
+        <OrderLayout/>
+      </ProtectedRoute>}>
+      <Route path="all" element={<OrdersList/>}/>
+      <Route path="pending" element={<PendingOrders/>}/>
+      <Route path="completed" element={<DeliveredOrders/>}/>
+      <Route path="cancelled" element={<CancelledOrders/>}/>
+       
+      </Route>
+
+
+
+
       </Routes>
      
     </BrowserRouter>

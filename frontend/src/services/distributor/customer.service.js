@@ -11,13 +11,13 @@ export  async function getCustomersDirectory({page=1,limit=10,search=""}) {
  return res
 }
 export async function addCustomer(formData) {
-  const res=API.post("/customers/",formData,{withCredentials:true,headers:"multipart/form-data"})
+  const res=await API.post("/customers/",formData,{withCredentials:true,headers:"multipart/form-data"})
   return res
 }
 export async function getCustomerById(customerId){
-  const res=API.get(`/customers/c/${customerId}`)
-  console.log("customer APi",res.data)
-  return res
+  const res=await API.get(`/customers/c/${customerId}`,{withCredentials:true})
+  console.log(res.data)
+  return res.data
 } 
 export async function getCustomerActivity(customerId) {
   const res=await API.get(`/customers/c/${customerId}/activity`)
@@ -26,8 +26,8 @@ export async function getCustomerActivity(customerId) {
 }
 export async function getCustomerOverview(customerId) {
   const res=await API.get(`/customers/c/${customerId}/overview`)
-  console.log("overview",res.data)
-  return res
+  console.log("overview",res)
+  return res.data
 }
 export async function getCustomerOrders(customerId) {
   const res=await API.get(`/customers/c/${customerId}/orders`)

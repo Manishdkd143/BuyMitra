@@ -36,12 +36,13 @@ const handleFileChange=(e)=>{
     setLoading(true);
 
     try {
-      const payload = new FormData();
-     
+      const payload = new FormData()
       Object.entries(form).forEach(([key, value]) => {
-        if (value) payload.append(key, value);
+        console.log(key,value)
+       if (value !== undefined && value !== null) {
+  payload.append(key, value);
+}
       });
-
       if (profilePic) {
         payload.append("profilePic", profilePic);
       }

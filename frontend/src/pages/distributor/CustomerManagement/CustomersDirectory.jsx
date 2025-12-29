@@ -68,6 +68,7 @@ const navigate=useNavigate();
               <th>Email</th>
               <th>Status</th>
               <th>Joined</th>
+              <th>Action</th>
             </tr>
           </thead>
 
@@ -110,7 +111,7 @@ const CustomerRow = ({ customer,onView }) => {
   return (
     <tr className="border-b border-gray-800 hover:bg-slate-800/50">
       {/* CUSTOMER */}
-      <td className="py-3 flex items-center gap-3" onClick={onView}>
+      <td className="py-3 flex items-center gap-3">
         <img
           src={customer.profilePic}
           alt={customer.name}
@@ -148,6 +149,11 @@ const CustomerRow = ({ customer,onView }) => {
       {/* DATE */}
       <td className="text-gray-400">
         {new Date(customer.createdAt).toLocaleDateString()}
+      </td>
+      <td>
+        <div className="">
+         <button className="hover:text-blue-600 hover:underline cursor-pointer" onClick={onView}>View</button>
+        </div>
       </td>
     </tr>
   );

@@ -12,10 +12,11 @@ import {
   ListChecks,
   TrendingUp,
 } from "lucide-react";
-import DistributorHeader from "../../../../layouts/DistributorHeader"; // same header
 import { useAuth } from "../../../../context/AuthContext";
+import DistributorHeader from "../../../../layouts/DistributorHeader";
 
-const CustomerLayout = () => {
+
+const OrderLayout = () => {
   const { logout } = useAuth();
 
   const linkClass = ({ isActive }) =>
@@ -47,21 +48,25 @@ const CustomerLayout = () => {
             </NavLink>
 
             {/* ===== CUSTOMER MANAGEMENT ===== */}
-            <p className={sectionTitle}>Customer Management</p>
+            <p className={sectionTitle}>Order Management</p>
 
-            <NavLink to="/distributor/customers/manage/add" className={linkClass}>
+            <NavLink to="/distributor/orders/manage/all" className={linkClass}>
               <UserPlus className="w-5 h-5" />
-              <span className="font-medium">Add Customer</span>
+              <span className="font-medium">Order List</span>
             </NavLink>
 
-            <NavLink to="/distributor/customers/manage/all" className={linkClass}>
+            <NavLink to="/distributor/orders/manage/pending" className={linkClass}>
               <Users className="w-5 h-5" />
-              <span className="font-medium">Customer List</span>
+              <span className="font-medium">Pending Orders</span>
             </NavLink>
 
-            <NavLink to="/distributor/customers/manage/insights" className={linkClass}>
+            <NavLink to="/distributor/orders/manage/completed" className={linkClass}>
               <TrendingUp className="w-5 h-5" />
-              <span className="font-medium">Customer Insights</span>
+              <span className="font-medium">Completed Orders</span>
+            </NavLink>
+            <NavLink to="/distributor/orders/manage/cancelled" className={linkClass}>
+              <TrendingUp className="w-5 h-5" />
+              <span className="font-medium">Cancelled Orders</span>
             </NavLink>
           </nav>
 
@@ -91,4 +96,4 @@ const CustomerLayout = () => {
   );
 };
 
-export default CustomerLayout;
+export default OrderLayout;

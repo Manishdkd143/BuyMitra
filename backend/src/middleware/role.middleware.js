@@ -17,6 +17,7 @@ const isAdmin=asyncHandler(async(req,res,next)=>{
 })
 const isAdminOrDistributor=asyncHandler(async(req,res,next)=>{
     const user=req?.user;
+    console.log(user.role)
         if(!user){
             throw new ApiError(401,"Unauthorized user!")
         }

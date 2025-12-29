@@ -1,18 +1,17 @@
 import mongoose from "mongoose";
-import { Order } from "../models/order.model";
-import { User } from "../models/user.model";
-import { ApiError } from "../utils/ApiError";
+import { Order } from "../models/order.model.js";
+import { User } from "../models/user.model.js";
+import { ApiError } from "../utils/ApiError.js";
 import crypto from "crypto"
-import { ApiResponse } from "../utils/ApiResponse";
-import asyncHandler from "../utils/asyncHandler";
-import { CustomerLedger } from "../models/customerLedger";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import { CustomerLedger } from "../models/customerLedger.js";
 const getTopcustomers = asyncHandler(async (req, res) => {
   const distributorId = req.user._id;
 
   if (!distributorId) {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
-
   // Distributor check
   if (req.user.role.toLowerCase() !== "distributor") {
     throw new ApiError(403, "Access denied! Only distributors allowed.");
@@ -200,7 +199,7 @@ const getCustomersDirectory = asyncHandler(async (req, res) => {
 });
 const addcustomer = asyncHandler(async (req, res) => {
   const distributor = req.user;
-
+console.log("body",req.body);
   if (!distributor) {
     throw new ApiError(401, "Unauthorized user!");
   }
@@ -273,7 +272,7 @@ delete response.refreshToken;
 const getCustomerById = asyncHandler(async (req, res) => {
   const user = req.user;
   const  customerId  = req.params.customerId;
-
+console.log("call")
   if (!user) {
     throw new ApiError(401, "Unauthorized user! Please login");
   }
@@ -283,7 +282,7 @@ const getCustomerById = asyncHandler(async (req, res) => {
   }
 
   if (!customerId) {
-    throw new ApiError(400, "customer ID is required");
+    throw new ApiError(400, "customer Id is required");
   }
 
   const customer=await User.findOne({
@@ -361,15 +360,15 @@ const statsAgg=await Order.aggregate([
 });
 const getCustomerOverview=asyncHandler(async(req,res)=>{
   const user=req.user;
-  const customerId=req.params.customerId;
-
+  const {customerId}=req.params;
+console.log("call")
   if(!user||user.role!=="distributor"){
      throw new ApiError(401,"Unauthorized user!")
   }
   if(!mongoose.isValidObjectId(customerId)){
      throw new ApiError(401,"Invalid customer id!")
   }
-     const customerDetails=await getCustomerById(customerId);
+     const customerDetails=await User.findOne({_id:new mongoose.Types.ObjectId(customerId)}).select({name:1, phone:1, email:1, status:1, createdAt:1, address:1})
      const overview=await Order.aggregate([
       {
         $match:{
@@ -434,7 +433,7 @@ const getCustomerOverview=asyncHandler(async(req,res)=>{
       totalPaid: 0,
       balanceDue: 0,
       lastOrderDate: null}
-      return res.status(200).json(new ApiResponse({customer,summary},"Customer overview fetched successfully"))
+      return res.status(200).json(new ApiResponse(200,{customerDetails,summary},"Customer overview fetched successfully"))
 })
 const getCustomerOrders=asyncHandler(async(req,res)=>{
    const user=req.user;

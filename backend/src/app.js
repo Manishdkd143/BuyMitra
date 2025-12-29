@@ -37,7 +37,7 @@ app.use('/api/v1/address',addressRouter);
 app.use('/api/v1/distributor',distributorRouter);
 app.use("/api/v1/inventory",invertory)
 app.use("/api/v1/payment",paymentRouter)
-app.use("/api/v1/order",orderRouter)
+app.use("/api/v1/orders",orderRouter)
 app.use("/api/v1/customers",customerRouter)
 
 

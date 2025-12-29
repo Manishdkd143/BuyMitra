@@ -150,25 +150,103 @@ const getMyOrders = asyncHandler(async (req, res) => {
 /* -------------------- DISTRIBUTOR ORDERS -------------------- */
 
 const getDistributorOrders = asyncHandler(async (req, res) => {
+  const user=req.user;
   const { page = 1, limit = 10 } = req.query;
-
-  const orders = await Order.find({ distributorId: req.user._id })
-    .populate("userId", "name phone")
-    .populate("products.productId", "name images")
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(Number(limit));
-
-  const total = await Order.countDocuments({ distributorId: req.user._id });
-
-  return res.status(200).json(
-    new ApiResponse(200, {
-      orders,
-      total,
-      currentPage: Number(page),
-      totalPages: Math.ceil(total / limit),
-    }, "Distributor orders fetched")
-  );
+  const {
+    startDate,          // "2025-01-01"
+    endDate,            // "2025-12-31"
+    orderStatus,        // "pending" | "delivered" | array bhi chalega
+    paymentStatus,      // "paid" | "pending" | "partial"
+    customerName,       // search string (partial match)
+    orderNumber         // exact or partial
+  } = req.body;
+  if(!user||user.role!=="distributor"){
+    throw new ApiError(401,"Unauthorized user")
+  }
+  const matchStage={
+   distributorId:user._id,
+   status:{$ne:"cancelled"}
+  };
+ if(startDate||endDate){
+   matchStage.createdAt={};
+   if(startDate) matchStage.createdAt.$gte=new Date(startDate);
+if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt.$lte = end;
+    }
+ }
+if(orderStatus){
+  matchStage.status=orderStatus?.toLowerCase().trim();
+}
+if(paymentStatus){
+  matchStage.paymentStatus=paymentStatus?.toLowerCase()
+}
+if(orderNumber){
+  matchStage.orderNumber={$regex:orderNumber,$options:"i"}
+}
+const skip=(Number(page)-1)*Number(limit);
+   const orders=await Order.aggregate([
+    {$match:matchStage},
+   {
+    $lookup:{
+      from:"users",
+      localField:"userId",
+       foreignField:"_id",
+       as:"customer"
+    }
+   },
+    {
+      $unwind:"$customer"
+    },
+    {
+...(customerName?[
+  {
+    $match:{
+      "customer.name":{$regex:customerName,$options:"i"}
+    }
+  }
+]:[])
+    },
+    {
+     $sort:{createdAt:-1}
+    },
+   {
+    $project:{
+     orderNumber:1,
+     customerName:"$customer.name",
+     orderDate:"$createdAt",
+     totalAmount:1,
+     paidAmount:{
+      $cond:[
+        {
+          $eq:["$paymentStatus","paid"]
+        },
+        "$totalAmount",
+        0
+      ]
+     },
+     dueAmount:{
+      $subtract:[
+        "$totalAmount",
+       { $cond:[
+         { $eq:["$paymentStatus","paid"]},
+         "$totalAmount",
+         0
+        ]}
+      ]
+     },
+     paymentMethod:1,
+     orderStatus:"$status",
+     paymentStatus:1
+    }
+   },
+   {$skip:skip},
+   {
+    $limit:Number(limit)
+   }
+  ])
+  return res.status(200).json(new ApiResponse(200,{orders,meta:{currentPage:Number(page),totalOrders:orders.length,totalPages:Math.ceil(Number(totalOrders/Number(limit)))}}))
 });
 
 /* -------------------- UPDATE ORDER STATUS -------------------- */
@@ -229,6 +307,238 @@ const cancelOrder = asyncHandler(async (req, res) => {
   );
 });
 
+const getPendingOrders=asyncHandler(async(req,res)=>{
+  const user=req.user;
+  if(!user||user.role!=="distributor"){
+    throw new ApiError(401,"Unauthorized user!")
+  }
+  const {page=1,limit=10,search=""}=req.query
+  const skip=(Number(page)-1)*Number(limit);
+ const result= await Order.aggregate([
+    {
+      $match:{
+        distributorId:user._id,
+        status:{$nin:["delivered","cancelled"]},
+        paymentStatus:{$ne:"paid"}
+      }
+    },
+    {
+      $lookup:{
+        from:"users",
+        localField:"userId",
+        foreignField:"_id",
+        as:"customer"
+      }
+    },
+    {
+      $unwind:"$customer"
+    },
+    {
+      $sort:{createdAt:-1}
+    },
+    ...(search?[{
+      $match:{
+        $or:[
+           { "customer.name":{$regex:search,$options:"i"}},
+            {"orderNumber":{$regex:search,$options:"i"}},
+          
+        ]
+      }
+    }]:[]),
+    {
+      $facet: {
+        data: [
+          { $skip: skip },
+          { $limit: Number(limit) },
+          {
+            $project: {
+              _id: 1,
+              orderNumber: 1,
+              customerName: "$customer.name",
+              customerId: "$customer._id",
+              customerPhone: "$customer.phone",
+              orderDate: "$createdAt",
+              totalAmount: 1,
+              paidAmount: { $ifNull: ["$paidAmount", 0] },
+              dueAmount: {
+                $subtract: [
+                  "$totalAmount",
+                  { $ifNull: ["$paidAmount", 0] },
+                ],
+              },
+              orderStatus: "$status",
+              paymentStatus: 1,
+            },
+          },
+        ],
+        totalCount: [{ $count: "count" }],
+      },
+    },
+  ])
+  const pendingOrders = result[0].data;
+  const totalOrders = result[0].totalCount[0]?.count || 0;
+  return res.status(200).json(new ApiResponse(200,{
+        pendingOrders,
+        meta: {
+          currentPage: Number(page),
+          totalOrders,
+          totalPages: Math.ceil(totalOrders / Number(limit)),
+        }},"Pending order fetched sucessfully"))
+})
+const  getDeliveredOrders=asyncHandler(async(req,res)=>{
+  const user=req.user;
+  if(!user||user.role!=="distributor"){
+    throw new ApiError(401,"Unauthorized user!")
+  }
+  const {page=1,limit=10,search=""}=req.query;
+  const skip=(Number(page)-1)*Number(limit);
+ const result= await Order.aggregate([
+    {
+      $match:{
+        distributorId:user._id,
+        status:"delivered"
+      }
+    },
+    {
+      $lookup:{
+        from:"users",
+        localField:"userId",
+        foreignField:"_id",
+        as:"customer"
+      }
+    },
+    {
+      $unwind:"$customer"
+    },
+    ...(search?[
+      {
+        $or:[
+          {"$customer.name":{$regex:search,$options:"i"}},
+          {orderNumber:{$regex:search,$options:"i"}},
+        ]
+      }
+    ]:[]),
+    {
+      $sort:{deliveredAt:-1,createdAt:-1}
+    },
+    {
+      $facet:{
+        data:[
+           { $skip: skip },
+          { $limit: Number(limit) },
+          {
+            $project: {
+              _id: 1,
+              orderNumber: 1,
+              customerName: "$customer.name",
+              customerPhone: "$customer.phone",
+              totalAmount: 1,
+              paidAmount: { $ifNull: ["$paidAmount", 0] },
+              paymentStatus: 1,
+              deliveredAt: 1,
+              createdAt: 1,
+            },
+          },
+        ],
+        totalCount:[{$count:"count"}]
+      }
+    }
+  ])
+
+  const deliveredOrders = result[0].data;
+  const totalOrders = result[0].totalCount[0]?.count || 0;
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        deliveredOrders,
+        meta: {
+          currentPage: Number(page),
+          totalOrders,
+          totalPages: Math.ceil(totalOrders / Number(limit)),
+        },
+      },
+      "Delivered orders fetched successfully"
+    )
+  );
+})
+const getCancelledOrders=asyncHandler(async(req,res)=>{
+  const user=req.user;
+    if(!user||user.role!=="distributor"){
+    throw new ApiError(401,"Unauthorized user!")
+  }
+  const {page=1,limit=10,search=""}=req.query;
+  const skip=(Number(page)-1)*Number(limit);
+ const result= await Order.aggregate([
+    {
+      $match:{
+        distributorId:user._id,
+        status:"cancelled"
+      }
+    },
+    {
+      $lookup:{
+        from:"users",
+        localField:"userId",
+        foreignField:"_id",
+        as:"customer",
+      }
+    },
+    {
+      $unwind:"$customer"
+    },
+    ...(search?[
+      {
+        $or:[
+          {"customer.name":{$regex:search,$options:"i"}},
+          {orderNumber:{$regex:search,$options:"i"}},
+        ]
+      }
+    ]:[]),
+    {
+$sort:{cancelledAt:-1,createdAt:-1}
+    },
+   {
+    $facet:{
+      data:[
+        { $skip: skip },
+          { $limit: Number(limit) },
+          {
+            $project:{
+             _id: 1,
+              orderNumber: 1,
+              customerName: "$customer.name",
+              customerPhone: "$customer.phone",
+              totalAmount: 1,
+              paidAmount: { $ifNull: ["$paidAmount", 0] },
+              paymentStatus: 1,
+              cancelReason: 1,
+              cancelledAt: 1,
+              createdAt: 1,
+            }
+          }
+      ],
+      totalCount:{$count:"count"},
+    }
+   }
+  ])
+  const cancelledOrders = result[0].data;
+  const totalOrders = result[0].totalCount[0]?.count || 0;
+ return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        cancelledOrders,
+        meta: {
+          currentPage: Number(page),
+          totalOrders,
+          totalPages: Math.ceil(totalOrders / Number(limit)),
+        },
+      },
+      "Cancelled orders fetched successfully"
+    )
+  );
+})
 /* -------------------- EXPORTS -------------------- */
 
 export {
@@ -238,4 +548,7 @@ export {
   getDistributorOrders,
   updateOrderStatus,
   cancelOrder,
+  getPendingOrders,
+  getDeliveredOrders,
+  getCancelledOrders
 };

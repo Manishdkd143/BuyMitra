@@ -344,12 +344,17 @@ const bulkUploadProducts = asyncHandler(async (req, res) => {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet);
 
+
   if (!rows.length) throw new ApiError(400, "Empty file");
-
+const session=await mongoose.startSession()
+session.startTransaction();
   // ----------------- PRODUCT DATA -----------------
-
+const existingProductSku=await Product.find({distributorId:user._id},{sku:1},{session}).select("sku")
+const existingSkuSet=new Set(existingProductSku.map(p=>p.sku))
 const productsPayload = [];
+let rejectedProducts=[]
 for (let i = 0; i < rows.length; i++) {
+  console.log("[products",rows[i])
   const p = rows[i];
   if (
   !p.name ||
@@ -357,88 +362,121 @@ for (let i = 0; i < rows.length; i++) {
   !p.wholesalePrice ||
   !p.category ||
   !p.unit ||
+  !p.sku||
   p.stock === undefined
 ) {
   throw new ApiError(
     400,
-    `Row ${i + 2}: name, price, wholesalePrice, category, unit, stock required`
+    `Row ${i + 2}: name, price, wholesalePrice, category, unit, stock,sku required`
   );
 }
 
-  const categoryId = await ensureCategoryExists(p.category);
 
-  const generateSlug = (name, sku) => {
-    return `${name}-${sku}`
+const generateSlug = (name, sku) => {
+    return `${name}-${sku}-${Date.now()}`
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)+/g, "");
   };
- const sku = p.sku
+  const sku = p.sku
   ? p.sku.toUpperCase().trim()
   : `SKU-${Date.now()}-${i}`;//unitsPerBase example:chilli 1kg=50pieces
  const unit =p.unit.toLowerCase();
  const unitsPerBase=unit==="piece"?1:Number(p.unitsPerBase)
-if(unit!=="piece"&&(!unitsPerBase||unitsPerBase<=0)){
+ if(unit!=="piece"&&(!unitsPerBase||unitsPerBase<=0)){
   throw new ApiError(400,`Row ${i+2}: Invalid unitsPerBase for unit ${unit}`);
 }
+if(existingSkuSet.has(sku)){
+  rejectedProducts.push({
+    row:i+2,
+    sku,
+    reason:"Sku already exists!"
+  })
+  continue;
+}
+const categoryId = await ensureCategoryExists(p.category);
+  
   productsPayload.push({
     name: p.name.trim().toLowerCase(),
     price: Number(p.price),
     brand:p.brand?.trim()||null,
     sku,
-    slug: generateSlug(p.name, sku), 
+    slug:generateSlug(p.name,sku), 
     category: categoryId,
     createdBy: user._id,
     wholesalePrice: Number(p.wholesalePrice),
     unit,
     unitsPerBase:unitsPerBase,
   });
+existingSkuSet.add(sku)
 }
+console.log("setLength",existingSkuSet.size)
 
   // ----------------- INSERT PRODUCTS -----------------
   const insertedProducts = await Product.insertMany(
     productsPayload,
-    { ordered: false }
+    {session, ordered: true },
   );
   if(!insertedProducts||insertedProducts.length===0){
     throw new ApiError(500,"Product insertion failed!")
   }
-  console.log("Inserted products:", insertedProducts.length);
+  // console.log("Inserted products:", insertedProducts.length);
 
   // ----------------- INVENTORY DATA -----------------
+  const rowMap=new Map();
+  rows.forEach(r=>{
+    const sku=(r.sku||"")?.toUpperCase().trim();
+    if (sku) {
+      rowMap.set(sku,r)
+    }
+  })
+  console.log(rowMap)
 const inventoryPayload = insertedProducts.map((product) => {
-  const row = rows.find(
-    r =>
-      (r.sku || "").toUpperCase() === product.sku
-  );
-  console.log("Matching row for inventory:", product)
- let quantity=Number(row?.stock||0);
+ const row=rowMap.get(product.sku.toUpperCase());
+   if (!row) {
+    throw new ApiError(
+      400,
+      `Inventory error: Stock not found for SKU ${product.sku}`
+    );
+  }
+ let quantity=Number(row?.stock);
+ if (isNaN(quantity) || quantity < 0) {
+    throw new ApiError(
+      400,
+      `Invalid stock value for SKU ${product.sku}`
+    );
+  }
  if(product.unit!=="piece"){
-  quantity=quantity*Number(product.unitsPerBase)
+  quantity=quantity*Number(product.unitsPerBase||1)
  }
-
   return {
     distributorId: user._id,
     productId: product._id,
     quantity:quantity,
   };
 });
-console.log("Inventory payload prepared:", inventoryPayload);
+// console.log("Inventory payload prepared:", inventoryPayload);
 
- const inventory = await Inventory.insertMany(inventoryPayload, { ordered: false });
+ const inventory = await Inventory.insertMany(inventoryPayload, { session,ordered: false });
 if(!inventory||inventory.length===0){
   throw new ApiError(500, "Inventory creation failed")
 }
-if(insertedProducts.length&&inventory.length){
-  fs.existsSync(req.file.path);
+
+session.commitTransaction();
+session.endSession()
+if(fs.existsSync(req.file.path)){
   fs.unlinkSync(req.file.path)
 }
   return res.status(201).json(
     new ApiResponse(
       201,
       {
-        productsInserted: insertedProducts.length,
-        inventoryCreated: inventory.length,
+        summary: {
+        total: rows.length,
+        inserted: insertedProducts.length,
+        skipped: rejectedProducts.length,
+      },
+      rejectedProducts
       },
       "Bulk products & inventory uploaded successfully"
     )
@@ -461,7 +499,6 @@ const getAllProducts = asyncHandler(async (req, res) => {
 
   const query = {
     createdBy: user._id,
-
   };
 
   if (status) query.status = status;

@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { Category } from "../models/category.model.js";
 import { DistributorProfile } from "../models/distributorProfile.model.js";
-import { Inventory } from "../models/inventory.model.js";
+import { Inventory} from "../models/inventory.model.js";
 import { Order } from "../models/order.model.js";
 import { Product } from "../models/product.model.js";
 import { User } from "../models/user.model.js";
@@ -11,6 +11,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ExcelJS from "exceljs"
 
 import uploadFileOnCloud from "../utils/Cloudinary.js";
+import { group } from "console";
 const updateDistributor = asyncHandler(async (req, res) => {
   const isLoggedUser = req.user;
   
@@ -1158,10 +1159,60 @@ async function getCategorySummary(distributorId) {
   ])
   
 }
-async function getInventoryList(distributorId){
-  return Inventory
-}
 
+const getInventoryList=(distributorId)=>{
+  return Inventory.aggregate([
+    {
+      $match:{
+        distributorId,
+      }
+    },
+    {
+      $lookup:{
+        from:"products",
+        localField:"productId",
+        foreignField:"_id",
+        as:"product"
+      }
+    },
+    {
+      $unwind:"$product"
+    },
+    {
+      $lookup:{
+        from:"categories",
+        localField:"product.category",
+        foreignField:"_id",
+        as:"category"
+      }
+    },
+    {
+      $unwind:"$category"
+    },
+    {
+      $facet:{
+        data:[
+          {
+            $project:{
+              productName:"$product.name",
+              categoryName:"$category.name",
+              images:"$product.images",
+              thumbnail:"$product.thumbnail",
+              stock:"$quantity",
+              status:"$product.status",
+              reorderLevel:1
+            }
+          },
+          {
+            $limit:15
+          },
+        ]
+      }
+    }
+  
+  ])
+
+}
 
 const getDashboardReports = asyncHandler(async (req, res) => {
   const user = req.user;
@@ -1202,11 +1253,7 @@ const getDashboardReports = asyncHandler(async (req, res) => {
     Inventory.countDocuments(filter),
     getLowStockProductsByCategory(distributorId),
     getCategorySummary(distributorId),
-    Inventory.find(filter)
-      .populate("productId", "name price brand category")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit)),
+    getInventoryList(distributorId)
   ]);
 
   return res.status(200).json(
@@ -1217,7 +1264,7 @@ const getDashboardReports = asyncHandler(async (req, res) => {
       totalPages: Math.ceil(totalProducts / Number(limit)),
       lowCategoryProducts,
       categorySummary,
-      inventoryList,
+      inventoryList:inventoryList[0]?.data,
     }, "Inventory report fetched successfully")
   );
 });

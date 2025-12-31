@@ -14,6 +14,10 @@ const InventorySchema=new Schema({
         type:Number,
        required:true,
        min:0,
+    },
+    reorderLevel:{
+        type:Number,
+        default:10,
     }
 },{
     timestamps:true,

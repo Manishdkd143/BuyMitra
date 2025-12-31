@@ -1,7 +1,7 @@
 
 import {mongoose,Schema} from "mongoose";
 const productSchema = new Schema({
-  name: { type: String, required: true, trim: true },
+  name: { type: String, trim: true },
   slug: { type: String,  lowercase: true },
   sku: { type: String, unique: true, required: true },
 
@@ -16,7 +16,7 @@ const productSchema = new Schema({
 
   brand: String,
   unit: { type: String,
-    enum:["piece","kg","litre","box","packet"],
+    enum:["piece","kg","liter","box","packet"],
      default: "piece" },
   weight: Number,
  unitsPerBase:{

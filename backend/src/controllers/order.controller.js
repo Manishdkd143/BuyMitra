@@ -2,11 +2,10 @@ import mongoose from "mongoose";
 import { Cart } from "../models/cart.model.js";
 import { Inventory } from "../models/inventory.model.js";
 import { Order } from "../models/order.model.js";
-import { Product } from "../models/product.model.js";
-import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import { checkReorderNeeded } from "../helpers/reorderCheck.helper.js";
 
 /* -------------------- HELPERS -------------------- */
 
@@ -539,6 +538,105 @@ $sort:{cancelledAt:-1,createdAt:-1}
     )
   );
 })
+
+
+/**
+ * CREATE ORDER
+ */
+export const createOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const distributorId = req.user._id;
+    const {
+      userId,
+      products,
+      shippingAddress,
+      paymentMethod = "cod",
+      orderNotes
+    } = req.body;
+
+    // -------------------- VALIDATION --------------------
+    if (!userId || !products || !products.length) {
+      throw new ApiError(400, "User & products are required");
+    }
+
+    let totalAmount = 0;
+
+    // -------------------- CHECK INVENTORY --------------------
+    for (const item of products) {
+      const inventory = await Inventory.findOne({
+        distributorId,
+        productId: item.productId
+      }).session(session);
+
+      if (!inventory) {
+        throw new ApiError(404, "Inventory not found for product");
+      }
+
+      if (inventory.quantity < item.qty) {
+        throw new ApiError(
+          400,
+          `Insufficient stock for product`
+        );
+      }
+
+      totalAmount += item.totalPrice;
+    }
+
+    // -------------------- CREATE ORDER --------------------
+    const [order] = await Order.create(
+      [{
+        distributorId,
+        userId,
+        products,
+        totalAmount,
+        shippingAddress,
+        paymentMethod,
+        orderNotes
+      }],
+      { session }
+    );
+
+    // -------------------- UPDATE INVENTORY + REORDER CHECK --------------------
+    for (const item of products) {
+      const inventory = await Inventory.findOne({
+        distributorId,
+        productId: item.productId
+      }).session(session);
+
+      inventory.quantity -= item.qty;
+      await inventory.save({ session });
+      if (inventory.quantity <= inventory.reorderLevel) {
+        
+        const resultNeeded= await checkReorderNeeded({
+          distributorId,
+          productId:item.productId,
+          session
+         })
+         if(resultNeeded?.reorderNeeded){
+console.log(
+          `⚠️ Reorder needed for product ${item.productId}`
+        );
+         }
+      }
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res
+      .status(201)
+      .json(new ApiResponse(201, order, "Order created successfully"));
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+};
+
 /* -------------------- EXPORTS -------------------- */
 
 export {

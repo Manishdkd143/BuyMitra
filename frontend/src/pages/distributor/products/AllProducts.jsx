@@ -246,7 +246,7 @@ const AllProducts = () => {
                             e.stopPropagation();
                             removeProduct(p.product._id);
                           }}
-                          className="text-red-400 hover:text-red-300"
+                          className="text-red-400 hover:text-red-300 cursor-pointer"
                         >
                           <Trash />
                         </button>

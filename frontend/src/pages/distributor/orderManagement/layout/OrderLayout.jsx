@@ -18,7 +18,6 @@ import DistributorHeader from "../../../../layouts/DistributorHeader";
 
 const OrderLayout = () => {
   const { logout } = useAuth();
-
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-4 py-3 rounded-lg transition
      ${
@@ -37,9 +36,9 @@ const OrderLayout = () => {
       {/* ================= BODY ================= */}
       <div className="flex flex-1">
         {/* =============== SIDEBAR ================= */}
-        <aside className="w-64 bg-[#0B0F1A] border-r border-gray-800 text-white flex flex-col">
+        <aside className="w-64 bg-[#0B0F1A] border-r border-gray-800 text-white flex flex-col ">
           {/* NAVIGATION */}
-          <nav className="flex-1 overflow-y-auto py-4 px-3">
+          <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
             {/* DASHBOARD */}
             <p className={sectionTitle}>Main</p>
             <NavLink to="/distributor/dashboard" className={linkClass}>

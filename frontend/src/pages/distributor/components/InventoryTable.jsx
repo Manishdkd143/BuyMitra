@@ -18,11 +18,11 @@ const InventoryTable = ({ data }) => (
         </thead>
         <tbody className="divide-y divide-gray-700">
           {data.map((item) => (
-            <tr key={item.id} className="hover:bg-gray-750 transition">
-              <td className="px-6 py-4 text-white">{item.name}</td>
-              <td className="px-6 py-4 text-gray-300">{item.category}</td>
-              <td className="px-6 py-4 text-white font-semibold">{item.stock}</td>
-              <td className="px-6 py-4 text-gray-300">{item.reorderLevel}</td>
+            <tr key={item._id} className="hover:bg-gray-750 transition">
+              <td className="px-6 py-4 text-white">{item?.productName}</td>
+              <td className="px-6 py-4 text-gray-300">{item?.categoryName}</td>
+              <td className="px-6 py-4 text-white font-semibold">{item?.stock}</td>
+              <td className="px-6 py-4 text-gray-300">{item?.reorderLevel}</td>
               <td className="px-6 py-4">
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                   item.status === 'Good' ? 'bg-green-600 text-white' :

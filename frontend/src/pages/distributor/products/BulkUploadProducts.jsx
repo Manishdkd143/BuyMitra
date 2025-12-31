@@ -13,7 +13,7 @@ const BulkUploadProducts = () => {
 
     if (
       !selected.name.endsWith(".xlsx") &&
-      !selected.name.endsWith(".xls")
+      !selected.name.endsWith(".xls")&&!selected.name.endsWith(".")
     ) {
       toast.error("Only Excel files allowed (.xls, .xlsx)");
       return;

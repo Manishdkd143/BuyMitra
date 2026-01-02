@@ -36,7 +36,10 @@ return response
 }
 export const forgotPassword=async(email)=>{
   console.log("email",email);
-  
 const response=await API.post("/auth/forgotpassword",{email:email},{withCredentials:true})
 return response
+}
+export const updatePassword=async({oldPass,newPass,ConfirmPass})=>{
+ const res=await  API.patch("/users/update-password",{oldPass,newPass,ConfirmPass},{withCredentials:true})
+ return res
 }

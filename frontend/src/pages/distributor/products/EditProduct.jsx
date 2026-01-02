@@ -153,15 +153,15 @@ const removeImage = (index) => {
     });
 
     // image fields
-    if (form.thumbnail) {
-      formData.append("thumbnail", form.thumbnail);
-    }
+    // if (form.thumbnail) {
+    //   formData.append("thumbnail", form.thumbnail);
+    // }
 
-    if (form.images?.length) {
-      form.images.forEach((img) => {
-        formData.append("images", img);
-      });
-    }
+    // if (form.images?.length) {
+    //   form.images.forEach((img) => {
+    //     formData.append("images", img);
+    //   });
+    // }
 
     console.log("FormData payload:", [...formData.entries()]);
 

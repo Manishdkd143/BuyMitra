@@ -23,7 +23,7 @@ import "react-toastify/ReactToastify.css"
 import AddProduct from "./pages/distributor/products/AddProduct";
 import AllProducts from "./pages/distributor/products/AllProducts";
 import ProductDetails from "./pages/distributor/products/ProductDetails";
-import ProductManagementLayout from "./pages/distributor/products/ProductManagementLayout";
+import ProductManagementLayout from "./pages/distributor/products/layout/ProductManagementLayout";
 import LowStock from "./pages/distributor/products/LowStock";
 import OutStock from "./pages/distributor/products/OutStock";
 import BulkUpload from "./pages/distributor/products/BulkUploadProducts";
@@ -40,6 +40,7 @@ import OrdersList from "./pages/distributor/orderManagement/OrdersList";
 import PendingOrders from "./pages/distributor/orderManagement/PendingOrders";
 import DeliveredOrders from "./pages/distributor/orderManagement/DeliveredOrders";
 import CancelledOrders from "./pages/distributor/orderManagement/CancelledOrders";
+import ChangePassword from "./pages/distributor/HeaderComponents/ChangePassword";
 function App() {
   return (
     <>
@@ -53,7 +54,7 @@ function App() {
         <Route path="/auth/forgotpassword" element={<ForgotPassword />} />
         <Route path="/auth/resetpassword/:token" element={<ResetPassword />} />
         <Route path="/logout" element={<Logout />} />
-
+        <Route path="/user/u/change-password" element={<ChangePassword/>}/>
      
 
         {/* ================= DISTRIBUTOR ROUTES (WITH LAYOUT) ================= */}

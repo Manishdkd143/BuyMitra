@@ -2,11 +2,13 @@ import { useState } from "react";
 import { toast } from "react-toastify";
 import { addCustomer } from "../../../services/distributor/customer.service";
 import { Upload, User } from "lucide-react";
-
+import {useNavigate} from "react-router-dom"
 const AddCustomer = () => {
   const [loading, setLoading] = useState(false);
   const [profilePic, setProfilePic] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [error, setError] = useState(null)
+  const navigate=useNavigate()
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -33,6 +35,9 @@ const handleFileChange=(e)=>{
 }
   const handleSubmit = async (e) => {
     e.preventDefault();
+   if([form.name,form.email,form.phone,form.gender,form.city,form.state,form.pincode].some(fields=>fields==="")){
+    setError("Please fill all required fields")
+   }
     setLoading(true);
 
     try {
@@ -43,13 +48,20 @@ const handleFileChange=(e)=>{
   payload.append(key, value);
 }
       });
+      
       if (profilePic) {
         payload.append("profilePic", profilePic);
       }
 
-      await addCustomer(payload);
-      toast.success("Customer added successfully");
- 
+     const res= await addCustomer(payload);
+     if(res.data.data.success){
+       toast.success("Customer added successfully");
+       setTimeout(() => {
+        navigate("/distributor/customers/manage/all")
+       }, 500);
+     }else{
+      setError(res.data.error)
+     }
       setForm({
         name: "",
         email: "",
@@ -72,7 +84,13 @@ const handleFileChange=(e)=>{
       <div className="max-w-4xl mx-auto">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6 border border-white/20">
           <h2 className="text-2xl font-bold text-white mb-6 text-center">Add New Customer</h2>
-          
+          <div>
+            {error && (
+              <div className="mb-4 p-2 bg-red-400 text-white rounded-lg text-center">
+                {error}
+                </div>
+            )}
+          </div>
           <div className="space-y-8">
             {/* Profile Picture Upload */}
             <div className="flex justify-center mb-4">

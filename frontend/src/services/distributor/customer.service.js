@@ -11,7 +11,8 @@ export  async function getCustomersDirectory({page=1,limit=10,search=""}) {
  return res
 }
 export async function addCustomer(formData) {
-  const res=await API.post("/customers/",formData,{withCredentials:true,headers:"multipart/form-data"})
+  const res=await API.post("/customers/add",formData,{withCredentials:true,headers:"multipart/form-data"})
+  console.log("add customer",res)
   return res
 }
 export async function getCustomerById(customerId){

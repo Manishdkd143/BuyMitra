@@ -7,7 +7,7 @@ const DistributorLayout = () => {
   const { logout } = useAuth();
 
   const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+    `flex items-center gap-2 px-3 py-3 rounded-lg transition-all duration-200 ${
       isActive
         ? "bg-blue-600 text-white shadow-md"
         : "text-gray-300 hover:bg-gray-700 hover:text-white"
@@ -21,7 +21,7 @@ const DistributorLayout = () => {
         {/* SIDEBAR */}
         <aside className="w-64 bg-gray-900 text-white flex flex-col shadow-xl ">
           {/* Logo */}
-          <div className="p-6 border-b border-gray-800">
+          {/* <div className="p-6 border-b border-gray-800">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Package className="w-6 h-6" />
@@ -31,7 +31,7 @@ const DistributorLayout = () => {
                 <p className="text-xs text-gray-400">Portal</p>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-5 ">
@@ -53,7 +53,9 @@ const DistributorLayout = () => {
               Order Management
             </NavLink>
 
-            <NavLink to="/distributor/customers/manage" className={linkClass}>
+            <NavLink to="/distributor/customers/manage/all"  className={(props) =>
+    `${linkClass(props)}`
+  }>
               <Users className="w-5 h-5" />
               Customer Management
             </NavLink>

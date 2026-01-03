@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const CompanyProfile = () => {
+const BusinessProfile = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +63,7 @@ const CompanyProfile = () => {
       </h1>
 
       <button
-        onClick={() => navigate("/distributor/profile/edit")}
+        onClick={() => navigate("/distributor/business/profile/edit")}
         className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white
                    font-semibold rounded-lg shadow-md"
       >
@@ -202,4 +202,4 @@ const Info = ({ label, value }) => (
 );
 
 
-export default CompanyProfile;
+export default BusinessProfile;

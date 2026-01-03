@@ -1,10 +1,10 @@
-import { Bell, LogOut, User,Lock} from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { Bell, LogOut, User,Lock, Menu} from "lucide-react";
+import { useAuth } from "../../../context/AuthContext";
 import { useState,useEffect, useRef } from "react";
-import { getUserProfile } from "../services/user/userProfile.service";
+import { getUserProfile } from "../../../services/user/userProfile.service";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-const DistributorHeader = () => {
+const DistributorHeader = ({onMenuClick}) => {
   const { user,logout} = useAuth();
   const navigate=useNavigate();
   const [section, setSection] = useState("Dashboard")
@@ -27,10 +27,15 @@ useEffect(() => {
 }, [location.pathname]);
   
   return (
-     <header className="h-16 text-white  bg-linear-to-br from-slate-900 via-purple-700 to-slate-700 border-b border-gray-200 px-6 flex items-center justify-between">
+     <header className="h-16 text-white  bg-linear-to-br from-slate-900 via-purple-700 to-slate-700 border-b border-gray-200 px-6 flex items-center justify-between  sticky top-0 z-40 
+          bg-gray-800/90 backdrop-blur-md 
+          shadow-sm">
 
       {/* LEFT */}
       <div className="flex items-center gap-4">
+        <button className="lg:hidden text-gray-300 hover:text-white" onClick={onMenuClick}>
+            <Menu className="w-7 h-7" />
+          </button>
         <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold">
           BM
         </div>
@@ -59,7 +64,7 @@ useEffect(() => {
       {/* Actions */}
       <button
         onClick={() => {
-          navigate("/distributor/profile");
+          navigate("/distributor/account");
           setOpen(false);
         }}
         className="w-full px-4 py-2 text-sm flex items-center gap-3 text-gray-300 hover:bg-gray-800 rounded-t-lg"
@@ -70,7 +75,7 @@ useEffect(() => {
 
       <button
         onClick={() => {
-          navigate("/user/u/change-password");
+          navigate("/distributor/account/change-password");
           setOpen(false);
         }}
         className="w-full px-3 py-2 text-sm flex items-center gap-1 text-gray-300 hover:bg-gray-800"

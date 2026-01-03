@@ -37,7 +37,7 @@ const DistributorDashboard = () => {
 
   return (
 
-      <div className="p-6 space-y-6 bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 min-h-screen">
+      <div className="p-3 space-y-6 bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 min-h-screen">
       {/* HEADER */}
       <div className={`bg-linear-to-r  from-indigo-600 to-blue-600 p-6 rounded-xl text-white shadow-lg`}>
         <h1 className="text-3xl font-bold">Inventory Reports</h1>

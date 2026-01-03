@@ -1,200 +1,90 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { loginUser } from "../../services/authService";
-import { useAuth } from "../../context/AuthContext";
-import toast from "react-hot-toast";
-
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
+import { loginUser } from '../../services/authService';
 
 const Login = () => {
-    const navigate = useNavigate();
-  const { login,user } = useAuth();
+  const navigate = useNavigate();
+  const { login, user } = useAuth();
+
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
+
+  // Handle successful login redirection (only once after login)
   useEffect(() => {
-    if (!loading ) {
-      if (user?.role === "distributor") {
-      
-          navigate("/distributor/dashboard");
-    
-  } else if (user?.role === "retailer") {
-    setTimeout(() => {
-      navigate("/retailer/dashboard");
-    }, 500);
-  }
+    if (user?.role) {
+      if (user.role === 'distributor') {
+        navigate('/distributor/dashboard', { replace: true });
+      } else if (user.role === 'customer' || user.role === 'customer') {
+        navigate('/customers/dashboard', { replace: true });
+      } else if (user.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      }
+      // Optional: toast.success('Welcome back!');
     }
-  }, [ loading, navigate,user]);
+  }, [user, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setError("");
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setError('');
 
+    // Basic validation
     if (!formData.email || !formData.password) {
-      setError("Both fields are required");
+      setError('Please enter email and password');
+      toast.error('Please enter email and password');
       setLoading(false);
       return;
     }
 
-    const result = await login(formData, loginUser);
-      if(result.success&&result.data){
-          setLoading(false)
+    try {
+      const result = await login(formData, loginUser);
+
+      if (result.success && result.data) {
+        toast.success('Login successful!');
+        // No need to set loading false here - redirect will happen via useEffect
+      } else {
+        const errorMsg = result?.message || 'Invalid email or password';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
-    if (!result.success){
-      setError(result?.message||"Invalid credentials!")
-       toast.error(result?.message);
-      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Something went wrong';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
       setLoading(false);
+    }
   };
-    const handleNavigate = (path) => {
-    navigate(`${path}`)
-  };
+
   return (
-//     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-//       <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
-//         <h2 className="text-2xl font-bold text-center mb-6">
-//           Login to Wholesale Panel
-//         </h2>
-
-//         {error && (
-//           <p className="mb-4 text-sm text-red-600 bg-red-100 p-2 rounded">
-//             {error}
-//           </p>
-//         )}
-
-//         <form onSubmit={handleSubmit} className="space-y-5">
-//           {/* Email */}
-//           <div>
-//             <label className="block mb-1 text-sm font-medium text-gray-700">
-//               Email
-//             </label>
-//             <input
-//               type="email"
-//               name="email"
-//               className="w-full p-3 rounded border text-black border-gray-300 focus:ring-2 focus:ring-primary-500 outline-none"
-//               placeholder="Enter email"
-//               value={formData.email}
-//               onChange={handleChange}
-//               required
-//             />
-//           </div>
-
-//           {/* Password */}
-//           <div className="relative">
-//   <label className="block mb-1 text-sm font-medium text-gray-700">
-//     Password
-//   </label>
-//   <input
-//     type={showPassword ? "text" : "password"}
-//     name="password"
-//     className="w-full p-3 rounded text-black border border-gray-300 focus:ring-2 focus:ring-primary-500 outline-none pr-12"
-//     placeholder="Enter password"
-//     value={formData.password}
-//     onChange={handleChange}
-//     required
-//   />
-
-//   {/* Eye Icon */}
-//   <button
-//     type="button"
-//     onClick={() => setShowPassword(!showPassword)}
-//     className="absolute right-3 top-[47px] text-gray-500  -translate-y-1/2 text-black-200 hover:text-gray-800 cursor-pointer"
-//   >
-//     {showPassword ? (
-//               // Eye Off Icon - Password is visible
-//               <svg 
-//                 className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" 
-//                 fill="none" 
-//                 viewBox="0 0 24 24" 
-//                 stroke="currentColor"
-//               >
-//                 <path 
-//                   strokeLinecap="round" 
-//                   strokeLinejoin="round" 
-//                   strokeWidth={2} 
-//                   d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" 
-//                 />
-//               </svg>
-//             ) : (
-//               // Eye Icon - Password is hidden
-//               <svg 
-//                 className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" 
-//                 fill="none" 
-//                 viewBox="0 0 24 24" 
-//                 stroke="currentColor"
-//               >
-//                 <path 
-//                   strokeLinecap="round" 
-//                   strokeLinejoin="round" 
-//                   strokeWidth={2} 
-//                   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" 
-//                 />
-//                 <path 
-//                   strokeLinecap="round" 
-//                   strokeLinejoin="round" 
-//                   strokeWidth={2} 
-//                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" 
-//                 />
-//               </svg>
-//             )}
-//   </button>
-// </div>
-
-//           {/* Button */}
-//           <button
-//             type="submit"
-//             disabled={loading}
-//             className="w-full bg-primary-600 text-white py-3 rounded-lg bg-black font-semibold hover:bg-primary-700 transition disabled:opacity-50"
-//           >
-//             {loading ? "Processing..." : "Login"}
-//           </button>
-//         </form>
-//      <div className="flex items-center justify-between">
-// <p className="mt-4 text-center text-sm text-gray-600">
-//           Forgot password?{" "}
-//           <span className="text-primary-600 cursor-pointer hover:underline">
-//             Reset
-//           </span>
-//         </p>
-//           <div className="mt-4 space-x-2">
-//       <button
-//         onClick={() => navigate("/register")}
-//         className="text-center text-sm text-gray-600 cursor-pointer"
-//       >
-//         Register
-//       </button>
-//       <button
-//         onClick={() => navigate("/register-admin")}
-//         className="text-center text-sm text-gray-600 cursor-pointer"
-//       >
-//         Register Admin
-//       </button>
-//     </div>
-//      </div>
-        
-//       </div>
-//     </div>
- <div className="min-h-screen py-8 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black px-4">
-      <div className="w-full max-w-md backdrop-blur-xl bg-white/10 border border-white/20 p-8 rounded-2xl shadow-2xl">
-        
-        <h2 className="text-2xl sm:text-3xl font-bold text-center text-white mb-6 tracking-wide">
-          Login to Wholesale Panel
-        </h2>
+    <div className="min-h-screen py-8 flex items-center justify-center bg-gradient-to-br from-gray-950 via-slate-900 to-black px-4">
+      <div className="w-full max-w-md backdrop-blur-xl bg-white/5 border border-white/10 p-8 rounded-2xl shadow-2xl">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-600/20 mb-4">
+            <LogIn className="w-7 h-7 text-blue-400" />
+          </div>
+          <h2 className="text-3xl font-bold text-white tracking-tight">Welcome Back</h2>
+          <p className="mt-2 text-gray-400">Login to your wholesale panel</p>
+        </div>
 
         {error && (
-          <div className="mb-4 text-sm text-red-300 bg-red-900/30 p-3 rounded-lg border border-red-500/30">
+          <div className="mb-6 p-4 bg-red-900/40 border border-red-600/50 rounded-xl text-red-300 text-sm">
             {error}
           </div>
         )}
 
-        <div className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email */}
           <div className="relative">
             <input
@@ -203,119 +93,96 @@ const Login = () => {
               value={formData.email}
               onChange={handleChange}
               placeholder=" "
-              className="peer w-full p-3 bg-transparent border border-gray-500 text-white rounded-lg focus:ring-2 focus:ring-blue-400 outline-none placeholder-transparent"
+              autoComplete="email"
+              required
+              className="peer w-full p-3.5 bg-gray-800/40 border border-gray-600 text-white rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition-all placeholder-transparent"
             />
-            <label className="absolute left-3 -top-2.5 text-xs text-blue-300 bg-gray-800 px-1 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:bg-transparent peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-300 peer-focus:bg-gray-800 transition-all">
-              Email
+            <label className="absolute left-4 -top-2.5 px-1 text-xs text-blue-300 bg-gray-950 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-300 peer-focus:bg-gray-950 transition-all">
+              Email address
             </label>
           </div>
 
           {/* Password */}
           <div className="relative">
             <input
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               name="password"
               value={formData.password}
               onChange={handleChange}
               placeholder=" "
-              className="peer w-full p-3 bg-transparent border border-gray-500 text-white rounded-lg focus:ring-2 focus:ring-blue-400 outline-none pr-12 placeholder-transparent"
+              autoComplete="current-password"
+              required
+              className="peer w-full p-3.5 bg-gray-800/40 border border-gray-600 text-white rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none pr-12 transition-all placeholder-transparent"
             />
-            <label className="absolute left-3 -top-2.5 text-xs text-blue-300 bg-gray-800 px-1 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:bg-transparent peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-300 peer-focus:bg-gray-800 transition-all">
+            <label className="absolute left-4 -top-2.5 px-1 text-xs text-blue-300 bg-gray-950 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3.5 peer-placeholder-shown:bg-transparent peer-focus:-top-2.5 peer-focus:text-xs peer-focus:text-blue-300 peer-focus:bg-gray-950 transition-all">
               Password
             </label>
+
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3 text-gray-300 hover:text-white transition"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
             >
-              {/* {showPassword ? (
-                // Eye Off Icon - Password is visible
-                <svg 
-                  className="h-5 w-5 text-gray-300 hover:text-white transition-colors" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" 
-                  />
-                </svg>
-              ) : (
-                // Eye Icon - Password is hidden
-                <svg 
-                  className="h-5 w-5 text-gray-300 hover:text-white transition-colors" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" 
-                  />
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" 
-                  />
-                </svg>
-              )} */}
-               {showPassword ? "🙈" : "👁️"}
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
 
-          {/* Submit Button */}
           <button
-            onClick={handleSubmit}
+            type="submit"
             disabled={loading}
-            className="w-full bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transform hover:scale-[1.02] active:scale-[0.98]"
+            className={`
+              w-full py-3.5 px-6 rounded-xl font-medium text-white
+              bg-gradient-to-r from-blue-600 to-indigo-600
+              hover:from-blue-500 hover:to-indigo-500
+              focus:outline-none focus:ring-2 focus:ring-blue-500/40
+              transition-all duration-300 shadow-lg shadow-blue-900/30
+              disabled:opacity-60 disabled:cursor-not-allowed
+              flex items-center justify-center gap-2
+            `}
           >
             {loading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Processing...
-              </span>
+                Signing in...
+              </>
             ) : (
-              "Login"
+              'Sign In'
             )}
           </button>
-        </div>
+        </form>
 
-        {/* Footer Links */}
-        <div className="mt-6 space-y-3">
-          {/* Forgot Password */}
-          <p className="text-center text-sm text-gray-300">
-            Forgot password?{" "}
-            <span 
-              className="text-blue-400 cursor-pointer hover:underline font-semibold"
-              onClick={() => handleNavigate("/auth/forgotpassword")}
+        <div className="mt-8 space-y-4">
+          <p className="text-center text-sm text-gray-400">
+            Forgot your password?{' '}
+            <button
+              type="button"
+              onClick={() => navigate('/auth/forgot-password')}
+              className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
             >
-              Reset
-            </span>
+              Reset here
+            </button>
           </p>
 
-          {/* Register Links */}
-          <div className="flex items-center justify-center gap-4 pt-2 border-t border-gray-600">
+          <div className="flex items-center justify-center gap-6 pt-4 border-t border-gray-700">
             <button
-              onClick={() => handleNavigate("/auth/register")}
-              className="text-sm text-gray-300 hover:text-blue-400 transition font-medium"
+              type="button"
+              onClick={() => navigate('/auth/register')}
+              className="text-gray-300 hover:text-blue-400 transition font-medium"
             >
-              Register
+              Create new account
             </button>
-            <span className="text-gray-500">|</span>
+
+            <span className="text-gray-600">•</span>
+
             <button
-              onClick={() => handleNavigate("/auth/admin/register")}
-              className="text-sm text-gray-300 hover:text-blue-400 transition font-medium"
+              type="button"
+              onClick={() => navigate('/auth/admin/register')}
+              className="text-gray-300 hover:text-blue-400 transition font-medium"
             >
-              Register Admin
+              Admin registration
             </button>
           </div>
         </div>
@@ -325,4 +192,3 @@ const Login = () => {
 };
 
 export default Login;
-

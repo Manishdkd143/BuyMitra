@@ -13,7 +13,7 @@ import Logout from "./pages/auth/Logout";
 import ProtectedRoute from "./routes/Protected";
 
 /* -------- LAYOUT -------- */
-import DistributorLayout from "./layouts/DistributorLayout";
+import DistributorLayout from "./pages/distributor/layouts/DistributorLayout";
 
 /* -------- DISTRIBUTOR PAGES -------- */
 import DistributorDashboard from "./pages/distributor/DistributorDashboard";
@@ -27,8 +27,7 @@ import ProductManagementLayout from "./pages/distributor/products/layout/Product
 import LowStock from "./pages/distributor/products/LowStock";
 import OutStock from "./pages/distributor/products/OutStock";
 import BulkUpload from "./pages/distributor/products/BulkUploadProducts";
-import EditCompanyProfile from "./pages/distributor/EditComProfile";
-import CompanyProfile from "./pages/distributor/CompanyProfile";
+import EditCompanyProfile from "./pages/distributor/EditBusinessProfile";
 import EditProduct from "./pages/distributor/products/EditProduct";
 import CustomerLayout from "./pages/distributor/CustomerManagement/layouts/Customer.layout";
 import CustomerOverview from "./pages/distributor/CustomerManagement/CustomerDetaiilsHub/CustomerOverview";
@@ -40,7 +39,12 @@ import OrdersList from "./pages/distributor/orderManagement/OrdersList";
 import PendingOrders from "./pages/distributor/orderManagement/PendingOrders";
 import DeliveredOrders from "./pages/distributor/orderManagement/DeliveredOrders";
 import CancelledOrders from "./pages/distributor/orderManagement/CancelledOrders";
-import ChangePassword from "./pages/distributor/HeaderComponents/ChangePassword";
+import ChangePassword from "./pages/distributor/HeaderComponents/ChangePasswordPage";
+import BusinessProfile from "./pages/distributor/BusinessProfile";
+import EditBusinessProfile from "./pages/distributor/EditBusinessProfile";
+import ProfilePage from "./pages/distributor/HeaderComponents/ProfilePage";
+import EditProfilePage from "./pages/distributor/HeaderComponents/EditProfilePage";
+import ChangePasswordPage from "./pages/distributor/HeaderComponents/ChangePasswordPage";
 function App() {
   return (
     <>
@@ -54,7 +58,7 @@ function App() {
         <Route path="/auth/forgotpassword" element={<ForgotPassword />} />
         <Route path="/auth/resetpassword/:token" element={<ResetPassword />} />
         <Route path="/logout" element={<Logout />} />
-        <Route path="/user/u/change-password" element={<ChangePassword/>}/>
+      
      
 
         {/* ================= DISTRIBUTOR ROUTES (WITH LAYOUT) ================= */}
@@ -70,8 +74,14 @@ function App() {
           <Route path="dashboard" element={<DistributorDashboard />} />
 
           {/* Profile */}
-          <Route path="profile" element={<CompanyProfile/>} />
-          <Route path="profile/edit" element={<EditCompanyProfile />} />
+        <Route path="account" element={<ProfilePage/>}/>
+          <Route path="account/change-password" element={<ChangePasswordPage/>}/>
+          <Route path="account/edit-account" element={<EditProfilePage/>}/>
+
+
+          {/* BusinessProfile */}
+          <Route path="business/profile" element={<BusinessProfile/>} />
+          <Route path="business/profile/edit" element={<EditBusinessProfile />} />
         </Route>
         //product Management
           <Route path="/distributor/products/manage"
@@ -114,12 +124,12 @@ function App() {
 
       </Routes>
      
-    </BrowserRouter>
      <ToastContainer
         position="top-right"
         autoClose={3000}
         theme="dark"
       />
+    </BrowserRouter>
 </>
   );
 }

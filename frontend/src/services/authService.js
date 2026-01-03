@@ -39,7 +39,7 @@ export const forgotPassword=async(email)=>{
 const response=await API.post("/auth/forgotpassword",{email:email},{withCredentials:true})
 return response
 }
-export const updatePassword=async({oldPass,newPass,ConfirmPass})=>{
- const res=await  API.patch("/users/update-password",{oldPass,newPass,ConfirmPass},{withCredentials:true})
+export const updatePassword=async({oldPass,newPass,confirmPass})=>{
+ const res=await  API.patch("/users/update-password",{oldPass,newPass,confirmPass},{withCredentials:true})
  return res
 }

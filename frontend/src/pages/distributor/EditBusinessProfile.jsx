@@ -10,7 +10,7 @@ import {
 import { toast } from "react-toastify";
 import { Upload, Trash2, FileText } from "lucide-react";
 
-const EditCompanyProfile = () => {
+const EditBusinessProfile = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -244,7 +244,7 @@ const EditCompanyProfile = () => {
   );
 };
 
-export default EditCompanyProfile;
+export default EditBusinessProfile;
 
 /* ---------- Small Input Helper ---------- */
 const Input = ({ label, ...props }) => (
